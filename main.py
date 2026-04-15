@@ -1,58 +1,72 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>רשימת קניות משפחתית</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Assistant', sans-serif; background-color: #f3f4f6; }
-        .item-checked { text-decoration: line-through; color: #9ca3af; }
-        .category-header { background: #e5e7eb; padding: 4px 12px; font-weight: bold; border-radius: 6px; margin-top: 12px; }
-    </style>
-</head>
-<body class="p-4">
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
-        <h1 class="text-2xl font-bold text-center mb-6 text-indigo-600">🛒 רשימת קניות משפחתית</h1>
-        
-        <form action="/add" method="POST" class="mb-6 flex gap-2">
-            <input type="text" name="item_name" placeholder="הוסף מוצר..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold">הוסף</button>
-        </form>
+import sys
+from flask import Flask, render_template, request, redirect, jsonify
+import sqlite3
+import os
+import json
 
-        <div class="space-y-1">
-            {% set last_cat = "" %}
-            {% for item in items %}
-                {% if item[2] != last_cat %}
-                    <div class="category-header text-sm text-gray-600">{{ item[2] }}</div>
-                    {% set last_cat = item[2] %}
-                {% endif %}
-                
-                <div class="flex items-center justify-between p-3 border-b last:border-0">
-                    <a href="/toggle/{{ item[0] }}" class="flex-1 flex items-center gap-3">
-                        <div class="w-6 h-6 border-2 rounded-full flex items-center justify-center {{ 'bg-green-500 border-green-500' if item[3] == 1 else 'border-gray-300' }}">
-                            {% if item[3] == 1 %}
-                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                            {% endif %}
-                        </div>
-                        <span class="text-lg {{ 'item-checked' if item[3] == 1 }}">{{ item[1] }}</span>
-                    </a>
-                </div>
-            {% endfor %}
-        </div>
+# הדפסה שתופיע בראש הלוגים לווידוא גרסה
+print("\n" + "#"*60, flush=True)
+print("###  SYSTEM RESTORED: VERSION 8.0 (FAMILY LIST)       ###", flush=True)
+print("###  AI POWERED & MULTI-ITEM SPLITTING ENABLED        ###", flush=True)
+print("#"*60 + "\n", flush=True)
 
-        {% if items %}
-        <div class="mt-8">
-            <a href="/clear" class="block w-full text-center py-3 bg-red-100 text-red-600 rounded-lg font-bold hover:bg-red-200 transition">
-                🗑️ נקה מוצרים שנקנו
-            </a>
-        </div>
-        {% endif %}
-    </div>
+try:
+    import google.generativeai as genai
+    print("✅ AI Library (google-generativeai) Loaded", flush=True)
+except ImportError:
+    print("❌ Error: google-generativeai missing! Check requirements.txt", flush=True)
+
+app = Flask(__name__)
+
+# --- הגדרות קבוצה ומפתחות ---
+# ה-ID של הקבוצה המשפחתית שלך
+ALLOWED_GROUP_ID = '120363425281087335@g.us'
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+# אתחול ה-AI
+model = None
+if GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        print("🤖 Gemini AI Engine Ready", flush=True)
+    except Exception as e:
+        print(f"❌ AI Init Error: {e}", flush=True)
+else:
+    print("⚠️ Warning: GEMINI_API_KEY missing in Railway Variables", flush=True)
+
+# קטגוריות
+CATEGORY_ORDER = [
+    'יבשים ושימורים', 'מוצרי חלב וביצים', 'בשר ודגים', 'פירות וירקות',
+    'מאפייה', 'קפואים', 'חטיפים ומתוקים', 'משקאות', 'ניקיון ותחזוקה',
+    'פארם והיגיינה', 'כללי/אחר'
+]
+
+def init_db():
+    conn = sqlite3.connect('shopping.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS items 
+                 (id INTEGER PRIMARY KEY, name TEXT, category TEXT, status INTEGER)''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def analyze_message_logic(text):
+    print(f"🔍 Analyzing message: {text}", flush=True)
     
-    <div class="text-center mt-6 text-gray-400 text-xs">
-        מחובר לקבוצה המשפחתית בוואטסאפ 🟢
-    </div>
-</body>
-</html>
+    if model:
+        try:
+            prompt = f"""
+            Identify shopping products in this Hebrew text. 
+            STRICT RULES:
+            1. Split multiple items (vav-hahibur or commas). 
+            2. Clean words like 'תביא', 'רק', 'לי', 'בבקשה', 'תקנה'.
+            3. Fix prefixes: 'ורסק' becomes 'רסק', 'וחלב' becomes 'חלב'.
+            4. Categories: {CATEGORY_ORDER}. 
+            Return JSON list: [{{"name": "product", "category": "cat"}}]
+            Text: "{text}"
+            """
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
+            if "
