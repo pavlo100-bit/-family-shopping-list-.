@@ -15,7 +15,8 @@ client = None
 if GEMINI_API_KEY:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-    except:
+    except Exception as e:
+        print(f"Failed to init Gemini: {e}")
         client = None
 
 CATEGORY_ORDER = [
@@ -35,25 +36,57 @@ init_db()
 
 def analyze_message(text):
     def fallback(t):
-        parts = t.replace(' וגם ', ',').replace(' ו', ',').replace(';', ',').replace('\n', ',').split(',')
+        import re
+        # פיצול חכם יותר - מפרידים לפי פסיק, נקודה פסיק, שורה חדשה או "וגם"
+        parts = re.split(r',|;|\n| וגם ', t)
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
     
-    if not client: return fallback(text)
+    if not client:
+        return fallback(text)
     
     try:
-        prompt = f"Identify products in Hebrew. Categories ONLY: {CATEGORY_ORDER}. Return ONLY JSON list: [{{'name': 'product', 'category': 'category'}}]. Text: {text}"
-        response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+        categories_str = "\n".join(f"- {cat}" for cat in CATEGORY_ORDER)
+        prompt = f"""אתה עוזר לסיווג מוצרי קניות לסופרמרקט.
+
+קבל את הטקסט הבא וחלץ ממנו רשימת מוצרים.
+סווג כל מוצר לאחת מהקטגוריות הבאות בלבד:
+{categories_str}
+
+חוקים:
+1. השתמש *בדיוק* בשם הקטגוריה כפי שכתוב למעלה
+2. אם לא בטוח — השתמש ב"כללי/אחר"
+3. החזר JSON בלבד, ללא טקסט נוסף
+
+פורמט הפלט:
+[{{"name": "שם המוצר", "category": "קטגוריה"}}]
+
+דוגמה:
+קלט: "חלב, עוף, שמפו"
+פלט: [{{"name": "חלב", "category": "מוצרי חלב וביצים"}}, {{"name": "עוף", "category": "בשר ודגים"}}, {{"name": "שמפו", "category": "פארם והיגיינה"}}]
+
+טקסט לעיבוד: {text}"""
+
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
+            config={"temperature": 0}  # דטרמיניסטי יותר למניעת הזיות
+        )
         
         raw = response.text.strip()
+        # ניקוי פורמט Markdown JSON אם קיים
         if "```" in raw:
-            raw = raw.split("```")[1].replace("json", "").split("```")[0].strip()
+            raw = raw.split("```")[1].replace("json", "").strip()
+            if "```" in raw:
+                raw = raw.split("```")[0].strip()
         
         items = json.loads(raw)
         for item in items:
             if item.get('category') not in CATEGORY_ORDER:
                 item['category'] = 'כללי/אחר'
         return items
-    except:
+
+    except Exception as e:
+        print(f"Gemini error: {e}")
         return fallback(text)
 
 @app.route('/')
@@ -84,8 +117,8 @@ def webhook():
                     c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
                 conn.commit()
                 conn.close()
-    except:
-        pass
+    except Exception as e:
+        print(f"Webhook error: {e}")
     return jsonify({"status": "success"}), 200
 
 @app.route('/add', methods=['POST'])
