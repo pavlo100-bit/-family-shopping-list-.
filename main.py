@@ -4,7 +4,8 @@ import os
 
 app = Flask(__name__)
 
-# יצירת בסיס הנתונים
+# --- יצירת בסיס הנתונים ---
+# פונקציה שיוצרת את הטבלה אם היא לא קיימת
 def init_db():
     conn = sqlite3.connect('shopping.db')
     c = conn.cursor()
@@ -13,7 +14,10 @@ def init_db():
     conn.commit()
     conn.close()
 
-# פונקציית הסיווג - ה"מוח"
+# הפעלה מיידית - זה קריטי כדי שהטבלה תיווצר ב-Railway
+init_db()
+
+# --- לוגיקת הסיווג (ה"מוח") ---
 def categorize(item_name):
     item_name = item_name.lower()
     categories = {
@@ -33,11 +37,13 @@ def categorize(item_name):
             return cat
     return 'כללי/אחר'
 
+# --- נתיבי האתר (Routes) ---
+
 @app.route('/')
 def index():
     conn = sqlite3.connect('shopping.db')
     c = conn.cursor()
-    # מיון לפי קטגוריות ואז לפי סטטוס (מה שנקנה יורד למטה)
+    # שליפת המוצרים: אלו שטרם נקנו (0) למעלה, ואלו שנקנו (1) למטה
     c.execute("SELECT * FROM items ORDER BY status ASC, category ASC")
     items = c.fetchall()
     conn.close()
@@ -74,5 +80,5 @@ def clear_list():
     return redirect('/')
 
 if __name__ == '__main__':
-    init_db()
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
