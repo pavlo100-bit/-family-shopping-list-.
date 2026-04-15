@@ -1,25 +1,23 @@
 import os
-import json
 import sqlite3
+import json
 from flask import Flask, render_template, request, redirect, jsonify
-import google.generativeai as genai
+from google import genai
 
 app = Flask(__name__)
 
-# הגדרות
+# הגדרות מערכת
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
-# אתחול ה-AI
-model = None
+# אתחול הלקוח החדש של גוגל
+client = None
 if GEMINI_API_KEY:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        client = genai.Client(api_key=GEMINI_API_KEY)
     except:
-        model = None
+        client = None
 
-# רשימת הקטגוריות המדויקת
 CATEGORY_ORDER = [
     'מוצרי חלב וביצים', 'בשר ודגים', 'מאפייה', 'פירות וירקות',
     'יבשים ושימורים', 'קפואים', 'חטיפים ומתוקים', 'משקאות', 
@@ -39,13 +37,17 @@ def analyze_message(text):
     def fallback(t):
         parts = t.replace(' וגם ', ',').replace(' ו', ',').replace(';', ',').replace('\n', ',').split(',')
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
-    if not model: return fallback(text)
+    
+    if not client: return fallback(text)
+    
     try:
-        prompt = "Extract items in Hebrew. Categories ONLY: " + str(CATEGORY_ORDER) + ". Return ONLY JSON list: [{'name': 'item', 'category': 'cat'}]. Text: " + text
-        response = model.generate_content(prompt)
+        prompt = f"Identify products in Hebrew. Categories ONLY: {CATEGORY_ORDER}. Return ONLY JSON list: [{{'name': 'product', 'category': 'category'}}]. Text: {text}"
+        response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+        
         raw = response.text.strip()
         if "```" in raw:
             raw = raw.split("```")[1].replace("json", "").split("```")[0].strip()
+        
         items = json.loads(raw)
         for item in items:
             if item.get('category') not in CATEGORY_ORDER:
