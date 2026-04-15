@@ -12,11 +12,12 @@ app = Flask(__name__)
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
+# אתחול הלקוח עם Gemini 2.0 Flash
 client = None
 if GEMINI_API_KEY:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        print("✅ AI Client Initialized - Gemini 2.0 Flash", flush=True)
+        print("✅ AI Client Initialized - Gemini 2.0 Flash Ready", flush=True)
     except Exception as e:
         print(f"❌ Failed to init Gemini: {e}", flush=True)
 
@@ -36,6 +37,7 @@ def init_db():
 init_db()
 
 def clean_text_manually(t):
+    # מנגנון ניקוי למקרה חירום
     ignore_words = ["תביא", "לי", "בבקשה", "רק", "תקנה", "צריך", "וגם", "גם"]
     t = t.replace(',', ' ').replace(';', ' ').replace('\n', ' ')
     for word in ignore_words:
@@ -49,22 +51,33 @@ def analyze_message(text):
     
     try:
         categories_str = "\n".join(f"- {cat}" for cat in CATEGORY_ORDER)
+        # ה-Prompt המקצועי והמעודכן שלך
         prompt = f"""אתה עוזר לסיווג מוצרי קניות לסופרמרקט.
 
 המשימה שלך:
 1. חלץ מהטקסט רק שמות מוצרים (התעלם ממילות בקשה כמו "תביא לי", "רק", "בבקשה")
-2. אם יש כמה מוצרים במשפט — פצל אותם לפריטים נפרדים
-3. סווג כל מוצר לקטגוריה המתאימה מהרשימה בלבד.
+2. שמור על שם המוצר המלא — אל תפצל מילים שמרכיבות שם מוצר אחד
+3. אם יש כמה מוצרים שונים — פצל אותם לפריטים נפרדים
+4. סווג כל מוצר לקטגוריה המתאימה מהרשימה
 
-קטגוריות:
+קטגוריות (השתמש בדיוק בשמות האלה):
 {categories_str}
 
-פורמט פלט — JSON בלבד:
+פורמט פלט — JSON בלבד, בלי טקסט נוסף:
 [{{"name": "שם המוצר", "category": "קטגוריה"}}]
+
+דוגמאות:
+קלט: "תביא לי רק עמק פרוס דק ולחם"
+פלט: [{{"name": "עמק פרוס דק", "category": "מוצרי חלב וביצים"}}, {{"name": "לחם", "category": "מאפייה"}}]
+
+קלט: "ורסק עגבניות, ביצים, נקניק"
+פלט: [{{"name": "ורסק עגבניות", "category": "יבשים ושימורים"}}, {{"name": "ביצים", "category": "מוצרי חלב וביצים"}}, {{"name": "נקניק", "category": "בשר ודגים"}}]
+
+קלט: "בננות ותפוחים"
+פלט: [{{"name": "בננות", "category": "פירות וירקות"}}, {{"name": "תפוחים", "category": "פירות וירקות"}}]
 
 טקסט לעיבוד: {text}"""
 
-        # מעבר ל-Gemini 2.0 Flash עם הקונפיגורציה החדשה
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt,
