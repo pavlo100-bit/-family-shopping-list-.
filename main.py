@@ -15,9 +15,9 @@ client = None
 if GEMINI_API_KEY:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
+        print("✅ AI Client Initialized", flush=True)
     except Exception as e:
-        print(f"Failed to init Gemini: {e}")
-        client = None
+        print(f"❌ Failed to init Gemini: {e}", flush=True)
 
 CATEGORY_ORDER = [
     'מוצרי חלב וביצים', 'בשר ודגים', 'מאפייה', 'פירות וירקות',
@@ -35,9 +35,10 @@ def init_db():
 init_db()
 
 def analyze_message(text):
+    raw = "no response"
     def fallback(t):
         import re
-        # פיצול חכם יותר - מפרידים לפי פסיק, נקודה פסיק, שורה חדשה או "וגם"
+        # פיצול חכם - מפרידים לפי פסיק, נקודה פסיק, שורה חדשה או "וגם"
         parts = re.split(r',|;|\n| וגם ', t)
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
     
@@ -48,32 +49,34 @@ def analyze_message(text):
         categories_str = "\n".join(f"- {cat}" for cat in CATEGORY_ORDER)
         prompt = f"""אתה עוזר לסיווג מוצרי קניות לסופרמרקט.
 
-קבל את הטקסט הבא וחלץ ממנו רשימת מוצרים.
-סווג כל מוצר לאחת מהקטגוריות הבאות בלבד:
+המשימה שלך:
+1. חלץ מהטקסט רק שמות מוצרים (התעלם ממילות בקשה כמו "תביא לי", "רק", "בבקשה")
+2. אם יש כמה מוצרים במשפט — פצל אותם לפריטים נפרדים
+3. סווג כל מוצר לקטגוריה המתאימה מהרשימה
+
+קטגוריות (השתמש בדיוק בשמות האלה):
 {categories_str}
 
-חוקים:
-1. השתמש *בדיוק* בשם הקטגוריה כפי שכתוב למעלה
-2. אם לא בטוח — השתמש ב"כללי/אחר"
-3. החזר JSON בלבד, ללא טקסט נוסף
-
-פורמט הפלט:
+פורמט פלט — JSON בלבד, בלי טקסט נוסף:
 [{{"name": "שם המוצר", "category": "קטגוריה"}}]
 
-דוגמה:
-קלט: "חלב, עוף, שמפו"
-פלט: [{{"name": "חלב", "category": "מוצרי חלב וביצים"}}, {{"name": "עוף", "category": "בשר ודגים"}}, {{"name": "שמפו", "category": "פארם והיגיינה"}}]
+דוגמאות:
+קלט: "תביא לי רק עמק פרוס דק ולחם"
+פלט: [{{"name": "עמק פרוס דק", "category": "מוצרי חלב וביצים"}}, {{"name": "לחם", "category": "מאפייה"}}]
+
+קלט: "ביצים, בננות, שמפו"
+פלט: [{{"name": "ביצים", "category": "מוצרי חלב וביצים"}}, {{"name": "בננות", "category": "פירות וירקות"}}, {{"name": "שמפו", "category": "פארם והיגיינה"}}]
 
 טקסט לעיבוד: {text}"""
 
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=prompt,
-            config={"temperature": 0}  # דטרמיניסטי יותר למניעת הזיות
+            config={"temperature": 0}
         )
         
         raw = response.text.strip()
-        # ניקוי פורמט Markdown JSON אם קיים
+        # ניקוי Markdown
         if "```" in raw:
             raw = raw.split("```")[1].replace("json", "").strip()
             if "```" in raw:
@@ -87,6 +90,7 @@ def analyze_message(text):
 
     except Exception as e:
         print(f"Gemini error: {e}")
+        print(f"Raw response: {raw}")
         return fallback(text)
 
 @app.route('/')
