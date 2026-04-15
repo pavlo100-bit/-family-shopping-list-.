@@ -4,8 +4,23 @@ import os
 
 app = Flask(__name__)
 
-# --- הגדרת הקבוצה המורשית ---
+# --- הגדרות ---
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
+
+# סדר הקטגוריות שיוצג באתר (לפי סדר ההליכה בסופר)
+CATEGORY_ORDER = [
+    'יבשים ושימורים',
+    'מוצרי חלב וביצים',
+    'בשר ודגים',
+    'פירות וירקות',
+    'מאפייה',
+    'קפואים',
+    'חטיפים ומתוקים',
+    'משקאות',
+    'ניקיון ותחזוקה',
+    'פארם והיגיינה',
+    'כללי/אחר'
+]
 
 # --- יצירת בסיס הנתונים ---
 def init_db():
@@ -20,18 +35,18 @@ init_db()
 
 # --- לוגיקת הסיווג ---
 def categorize(item_name):
-    item_name = item_name.lower()
+    item_name = item_name.strip().lower()
     categories = {
         'פירות וירקות': ['עגבניה', 'מלפפון', 'בצל', 'תפוח', 'בננה', 'חסה', 'גזר', 'פלפל', 'קישוא', 'לימון', 'פירות', 'ירקות', 'תפו"א'],
-        'מוצרי חלב וביצים': ['חלב', 'גבינה', 'יוגורט', 'קוטג', 'חמאה', 'שמנת', 'ביצים', 'צהובה', 'לבנה', 'מעדן'],
-        'בשר ודגים': ['עוף', 'בקר', 'המבורגר', 'שניצל', 'נקניקיות', 'בשר', 'דג', 'טונה', 'פילה', 'טחון'],
-        'מאפייה': ['לחם', 'פיתות', 'לחמניות', 'חלה', 'באגט', 'פירורי לחם'],
-        'יבשים ושימורים': ['אורז', 'פסטה', 'סוכר', 'קמח', 'עדשים', 'פתיתים', 'שימורים', 'שמן', 'רסק', 'קטשופ', 'קפה', 'תה'],
-        'קפואים': ['צ\'יפס', 'פיצה', 'גלידה', 'מלווח', 'בורקס', 'קפוא'],
-        'חטיפים ומתוקים': ['במבה', 'ביסלי', 'שוקולד', 'עוגיות', 'וופל', 'מסטיק', 'סוכריות'],
-        'משקאות': ['מים', 'קולה', 'מיץ', 'סודה', 'בירה', 'יין'],
-        'ניקיון ותחזוקה': ['אבקת כביסה', 'מרכך', 'נוזל כלים', 'אקונומיקה', 'סמרטוט', 'זבל'],
-        'פארם והיגיינה': ['שמפו', 'סבון', 'משחה', 'נייר טואלט', 'דאודורנט', 'חיתולים', 'מגבונים']
+        'מוצרי חלב וביצים': ['חלב', 'גבינה', 'יוגורט', 'קוטג', 'חמאה', 'שמנת', 'ביצים', 'צהובה', 'לבנה', 'מעדן', 'גבנצ'],
+        'בשר ודגים': ['עוף', 'בקר', 'המבורגר', 'שניצל', 'נקניקיות', 'בשר', 'דג', 'טונה', 'פילה', 'טחון', 'קבב', 'פרגיות'],
+        'מאפייה': ['לחם', 'פיתות', 'לחמניות', 'חלה', 'באגט', 'פירורי לחם', 'עוגה'],
+        'יבשים ושימורים': ['אורז', 'פסטה', 'סוכר', 'קמח', 'עדשים', 'פתיתים', 'שימורים', 'שמן', 'רסק', 'קטשופ', 'קפה', 'תה', 'ספגטי', 'מלח'],
+        'קפואים': ['צ\'יפס', 'פיצה', 'גלידה', 'מלווח', 'בורקס', 'קפוא', 'אפונה'],
+        'חטיפים ומתוקים': ['במבה', 'ביסלי', 'שוקולד', 'עוגיות', 'וופל', 'מסטיק', 'סוכריות', 'פיצוחים'],
+        'משקאות': ['מים', 'קולה', 'מיץ', 'סודה', 'בירה', 'יין', 'זירו'],
+        'ניקיון ותחזוקה': ['אבקת כביסה', 'מרכך', 'נוזל כלים', 'אקונומיקה', 'סמרטוט', 'זבל', 'מטלית'],
+        'פארם והיגיינה': ['שמפו', 'סבון', 'משחה', 'נייר טואלט', 'דאודורנט', 'חיתולים', 'מגבונים', 'קיסמים']
     }
     for cat, keywords in categories.items():
         if any(keyword in item_name for keyword in keywords):
@@ -44,51 +59,58 @@ def categorize(item_name):
 def index():
     conn = sqlite3.connect('shopping.db')
     c = conn.cursor()
-    # מיון: מה שטרם נקנה למעלה, ואז לפי קטגוריות
-    c.execute("SELECT * FROM items ORDER BY status ASC, category ASC")
+    
+    # שאילתה שממיינת לפי הסדר שקבענו ב-CATEGORY_ORDER
+    # אנחנו משתמשים ב-CASE כדי לתת משקל לכל קטגוריה
+    order_query = "CASE category "
+    for i, cat in enumerate(CATEGORY_ORDER):
+        order_query += f"WHEN '{cat}' THEN {i} "
+    order_query += "END"
+    
+    c.execute(f"SELECT * FROM items ORDER BY status ASC, {order_query} ASC")
     items = c.fetchall()
     conn.close()
     return render_template('index.html', items=items)
 
-# הוספה ידנית מהאתר
 @app.route('/add', methods=['POST'])
 def add_item():
     name = request.form.get('item_name')
     if name:
-        category = categorize(name)
+        # פירוק הודעות עם כמה שורות
+        lines = name.split('\n')
         conn = sqlite3.connect('shopping.db')
         c = conn.cursor()
-        c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (name, category))
+        for line in lines:
+            if line.strip():
+                category = categorize(line)
+                c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (line.strip(), category))
         conn.commit()
         conn.close()
     return redirect('/')
 
-# קבלת הודעות מוואטסאפ (Webhook)
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json()
-    
     try:
         if data.get('typeWebhook') == 'incomingMessageReceived':
             chat_id = data['senderData']['chatId']
-            
-            # הבדיקה הקריטית: האם ההודעה מהקבוצה המשפחתית?
             if chat_id == ALLOWED_GROUP_ID:
-                message_text = data['messageData']['textMessageData']['textMessage']
-                category = categorize(message_text)
+                full_text = data['messageData']['textMessageData']['textMessage']
+                
+                # פירוק הטקסט לשורות (אם יש)
+                lines = full_text.split('\n')
                 
                 conn = sqlite3.connect('shopping.db')
                 c = conn.cursor()
-                c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (message_text, category))
+                for line in lines:
+                    if line.strip():
+                        category = categorize(line)
+                        c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (line.strip(), category))
                 conn.commit()
                 conn.close()
-                print(f"✅ מוצר נוסף מהקבוצה: {message_text}")
-            else:
-                print(f"⚠️ התעלמתי מהודעה מכתובת לא מורשית: {chat_id}")
-                
+                print(f"✅ נוספו {len(lines)} מוצרים מהקבוצה")
     except Exception as e:
-        print(f"❌ שגיאה בעיבוד הודעה: {e}")
-        
+        print(f"❌ שגיאה: {e}")
     return jsonify({"status": "success"}), 200
 
 @app.route('/toggle/<int:item_id>')
