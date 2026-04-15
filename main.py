@@ -38,56 +38,79 @@ def analyze_message(text):
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
     if not model: return fallback(text)
     try:
-        prompt = "Identify shopping items in Hebrew. Categories: " + str(CATEGORY_ORDER) + ". Return ONLY JSON list: [{'name': 'item', 'category': 'cat'}]. Text: " + text
+        prompt = "Identify products in Hebrew. Categories: " + str(CATEGORY_ORDER) + ". Return ONLY JSON list: [{'name': 'item', 'category': 'cat'}]. Text: " + text
         response = model.generate_content(prompt)
         raw = response.text.strip()
-        if "
-http://googleusercontent.com/immersive_entry_chip/0
+        if "```" in raw:
+            raw = raw.split("```")[1].replace("json", "").split("```")[0].strip()
+        items = json.loads(raw)
+        return items
+    except:
+        return fallback(text)
 
----
+@app.route('/')
+def index():
+    conn = sqlite3.connect('shopping.db')
+    c = conn.cursor()
+    order_query = "CASE category "
+    for i, cat in enumerate(CATEGORY_ORDER):
+        order_query += f"WHEN '{cat}' THEN {i} "
+    order_query += "END"
+    c.execute(f"SELECT * FROM items ORDER BY status ASC, {order_query} ASC, name ASC")
+    items = c.fetchall()
+    conn.close()
+    return render_template('index.html', items=items)
 
-### 2. קובץ העיצוב: `templates/index.html`
-```html
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>רשימת קניות</title>
-    <style>
-        body { font-family: system-ui, sans-serif; background: #f8fafc; margin: 0; padding: 0; direction: rtl; }
-        .container { width: 100%; max-width: 800px; margin: 0 auto; background: white; min-height: 100vh; box-shadow: 0 0 20px rgba(0,0,0,0.05); }
-        header { background: #4f46e5; color: white; padding: 40px 20px; text-align: center; }
-        header h1 { font-size: 40px; margin: 0; }
-        .input-box { padding: 30px; text-align: center; border-bottom: 2px solid #f1f5f9; }
-        input { width: 90%; padding: 15px; font-size: 20px; border: 2px solid #ddd; border-radius: 10px; margin-bottom: 15px; }
-        button { width: 90%; padding: 15px; font-size: 20px; background: #4f46e5; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
-        .cat-header { background: #f1f5f9; padding: 15px 25px; font-weight: 800; font-size: 20px; color: #64748b; border-right: 5px solid #4f46e5; }
-        .item { display: flex; align-items: center; padding: 20px 25px; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: #1e293b; }
-        .checkbox { width: 30px; height: 30px; border: 3px solid #cbd5e1; border-radius: 50%; margin-left: 20px; flex-shrink: 0; }
-        .checked-bg { background: #4f46e5; border-color: #4f46e5; }
-        .text { font-size: 24px; font-weight: 600; }
-        .done { text-decoration: line-through; opacity: 0.4; }
-        .clear { display: block; width: 90%; margin: 30px auto; padding: 20px; background: #fff1f2; color: #e11d48; text-align: center; text-decoration: none; font-size: 20px; font-weight: 800; border-radius: 12px; border: 2px solid #fecdd3; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header><h1>רשימת קניות 🛒</h1></header>
-        <div class="input-box">
-            <form action="/add" method="POST"><input type="text" name="item_name" placeholder="להוסיף מוצר..."><br><button type="submit">הוסף</button></form>
-        </div>
-        <div>
-            {% set ns = namespace(last_cat="") %}
-            {% for item in items %}
-                {% if item[2] != ns.last_cat %} <div class="cat-header">{{ item[2] }}</div> {% set ns.last_cat = item[2] %} {% endif %}
-                <a href="/toggle/{{ item[0] }}" class="item">
-                    <div class="checkbox {{ 'checked-bg' if item[3] == 1 }}"></div>
-                    <span class="text {{ 'done' if item[3] == 1 }}">{{ item[1] }}</span>
-                </a>
-            {% endfor %}
-        </div>
-        {% if items %}<a href="/clear" class="clear">🗑️ נקה שנקנה</a>{% endif %}
-    </div>
-</body>
-</html>
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.get_json()
+    try:
+        if 'messageData' in data and 'textMessageData' in data['messageData']:
+            full_text = data['messageData']['textMessageData']['textMessage']
+            chat_id = data['senderData']['chatId']
+            if chat_id == ALLOWED_GROUP_ID:
+                results = analyze_message(full_text)
+                conn = sqlite3.connect('shopping.db')
+                c = conn.cursor()
+                for item in results:
+                    c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
+                conn.commit()
+                conn.close()
+    except:
+        pass
+    return jsonify({"status": "success"}), 200
+
+@app.route('/add', methods=['POST'])
+def add_item():
+    name = request.form.get('item_name')
+    if name:
+        results = analyze_message(name)
+        conn = sqlite3.connect('shopping.db')
+        c = conn.cursor()
+        for item in results:
+            c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
+        conn.commit()
+        conn.close()
+    return redirect('/')
+
+@app.route('/toggle/<int:item_id>')
+def toggle_item(item_id):
+    conn = sqlite3.connect('shopping.db')
+    c = conn.cursor()
+    c.execute("UPDATE items SET status = 1 - status WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+@app.route('/clear')
+def clear_list():
+    conn = sqlite3.connect('shopping.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM items WHERE status = 1")
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
