@@ -1,11 +1,10 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 import sqlite3
 import os
 
 app = Flask(__name__)
 
 # --- יצירת בסיס הנתונים ---
-# פונקציה שיוצרת את הטבלה אם היא לא קיימת
 def init_db():
     conn = sqlite3.connect('shopping.db')
     c = conn.cursor()
@@ -14,10 +13,9 @@ def init_db():
     conn.commit()
     conn.close()
 
-# הפעלה מיידית - זה קריטי כדי שהטבלה תיווצר ב-Railway
 init_db()
 
-# --- לוגיקת הסיווג (ה"מוח") ---
+# --- לוגיקת הסיווג ---
 def categorize(item_name):
     item_name = item_name.lower()
     categories = {
@@ -37,18 +35,18 @@ def categorize(item_name):
             return cat
     return 'כללי/אחר'
 
-# --- נתיבי האתר (Routes) ---
+# --- נתיבי האתר ---
 
 @app.route('/')
 def index():
     conn = sqlite3.connect('shopping.db')
     c = conn.cursor()
-    # שליפת המוצרים: אלו שטרם נקנו (0) למעלה, ואלו שנקנו (1) למטה
     c.execute("SELECT * FROM items ORDER BY status ASC, category ASC")
     items = c.fetchall()
     conn.close()
     return render_template('index.html', items=items)
 
+# הוספה ידנית מהאתר
 @app.route('/add', methods=['POST'])
 def add_item():
     name = request.form.get('item_name')
@@ -60,6 +58,35 @@ def add_item():
         conn.commit()
         conn.close()
     return redirect('/')
+
+# קבלת הודעות מוואטסאפ (Webhook)
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.get_json()
+    
+    # הדפסה ללוגים כדי שנוכל למצוא את ה-Chat ID
+    print("🔔 הודעה חדשה הגיעה מגרין API:", data)
+    
+    try:
+        # בדיקה אם זו הודעה נכנסת
+        if data.get('typeWebhook') == 'incomingMessageReceived':
+            chat_id = data['senderData']['chatId']
+            message_text = data['messageData']['textMessageData']['textMessage']
+            
+            # כרגע אנחנו מאפשרים לכל הודעה להיכנס. 
+            # בשלב הבא נסנן רק לפי ה-ID של הקבוצה שלך.
+            category = categorize(message_text)
+            conn = sqlite3.connect('shopping.db')
+            c = conn.cursor()
+            c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (message_text, category))
+            conn.commit()
+            conn.close()
+            print(f"✅ מוצר נוסף בוואטסאפ: {message_text}")
+            
+    except Exception as e:
+        print(f"❌ שגיאה בעיבוד הודעה: {e}")
+        
+    return jsonify({"status": "success"}), 200
 
 @app.route('/toggle/<int:item_id>')
 def toggle_item(item_id):
