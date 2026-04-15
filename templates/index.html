@@ -16,7 +16,6 @@
             text-transform: uppercase; letter-spacing: 0.05em;
         }
         .checkbox-custom { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        .tap-target { -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
 <body class="pb-24">
@@ -24,21 +23,21 @@
         
         <header class="p-8 pt-12 text-center">
             <h1 class="text-4xl font-extrabold text-slate-800 tracking-tight">רשימת קניות <span class="text-indigo-600">🛒</span></h1>
-            <p class="text-slate-500 font-medium mt-1 uppercase tracking-widest text-xs">Family Sync v15.0</p>
+            <p class="text-slate-500 font-medium mt-1 uppercase tracking-widest text-[10px]">Family Sync v15.0</p>
         </header>
 
         <div class="px-4 mb-8">
             <form action="/add" method="POST" class="flex gap-2 bg-white p-2 rounded-3xl shadow-lg shadow-slate-200/50 border border-white">
                 <input type="text" name="item_name" placeholder="חלב, לחם, גבינה..." 
                        class="flex-1 px-5 py-3 bg-transparent focus:outline-none text-lg font-medium text-slate-700">
-                <button type="submit" class="bg-indigo-600 text-white p-4 rounded-2xl font-bold shadow-lg shadow-indigo-200 active:scale-90 transition-transform tap-target">
+                <button type="submit" class="bg-indigo-600 text-white p-4 rounded-2xl font-bold active:scale-90 transition-transform">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
                 </button>
             </form>
         </div>
 
         <div class="px-4 flex-1">
-            <div class="bg-white rounded-[2rem] shadow-xl shadow-slate-200/60 overflow-hidden mb-8 border border-white">
+            <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden mb-8 border border-white">
                 {% if not items %}
                     <div class="p-20 text-center">
                         <div class="text-6xl mb-4 opacity-20">🍳</div>
@@ -54,7 +53,7 @@
                             {% endif %}
                             
                             <div class="group">
-                                <a href="/toggle/{{ item[0] }}" class="tap-target flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors {{ 'item-checked' if item[3] == 1 }}">
+                                <a href="/toggle/{{ item[0] }}" class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors {{ 'item-checked' if item[3] == 1 }}">
                                     <div class="checkbox-custom w-9 h-9 rounded-full border-2 flex items-center justify-center {{ 'bg-indigo-600 border-indigo-600 shadow-md shadow-indigo-100' if item[3] == 1 else 'border-slate-200 bg-white' }}">
                                         {% if item[3] == 1 %}
                                             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
@@ -70,15 +69,14 @@
 
             {% if items %}
             <div class="px-2 mb-12">
-                <a href="/clear" class="flex items-center justify-center gap-3 w-full py-5 bg-white text-rose-500 rounded-[1.5rem] font-black border border-rose-100 shadow-sm active:bg-rose-50 transition-all tap-target">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    נקה מוצרים שנקנו
+                <a href="/clear" class="flex items-center justify-center gap-3 w-full py-5 bg-white text-rose-500 rounded-[1.5rem] font-black border border-rose-100 shadow-sm active:bg-rose-50 transition-all">
+                    🗑️ נקה מוצרים שנקנו
                 </a>
             </div>
             {% endif %}
         </div>
 
-        <footer class="text-center p-8 space-y-3">
+        <footer class="text-center p-8">
             <div class="inline-flex items-center px-5 py-2.5 bg-white text-emerald-600 rounded-full text-xs font-black shadow-sm border border-emerald-50">
                 <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full ml-2.5 animate-pulse"></span>
                 מחובר לקבוצה המשפחתית
