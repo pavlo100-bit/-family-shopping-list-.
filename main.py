@@ -6,26 +6,22 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# סימן זיהוי גירסה
 print("\n" + "="*50)
-print("🚀 FAMILY LIST - VERSION 19.0 - BIG & BOLD")
+print("🚀 FAMILY LIST - VERSION 20.0 - THE BIG RESET")
 print("="*50 + "\n", flush=True)
 
-# --- הגדרות מערכת ---
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
-# אתחול ה-AI
 model = None
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        print("✅ AI Engine Ready", flush=True)
+        print("✅ AI Ready", flush=True)
     except Exception as e:
-        print(f"❌ AI Init Error: {e}", flush=True)
+        print(f"❌ AI Error: {e}", flush=True)
 
-# רשימת הקטגוריות
 CATEGORY_ORDER = [
     'מוצרי חלב וביצים', 'בשר ודגים', 'מאפייה', 'פירות וירקות',
     'יבשים ושימורים', 'קפואים', 'חטיפים ומתוקים', 'משקאות', 
@@ -43,101 +39,20 @@ def init_db():
 init_db()
 
 def analyze_message(text):
-    print(f"🔍 Analyzing: {text}", flush=True)
-    
     def fallback(t):
         parts = t.replace(' וגם ', ',').replace(' ו', ',').replace(';', ',').replace('\n', ',').split(',')
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
-
-    if not model:
-        return fallback(text)
-
+    if not model: return fallback(text)
     try:
-        prompt = f"""
-        Extract items from this Hebrew shopping list: "{text}"
-        Return ONLY a JSON array. 
-        Categories: {CATEGORY_ORDER}.
-        Example: [{{"name": "חלב", "category": "מוצרי חלב וביצים"}}]
-        """
+        prompt = f"Identify products. Split items. Categories: {CATEGORY_ORDER}. Return ONLY JSON: [{{'name': 'item', 'category': 'cat'}}]. Text: '{text}'"
         response = model.generate_content(prompt)
         raw = response.text.strip()
-        
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"): raw = raw[4:]
-            raw = raw.split("```")[0].strip()
-        
-        items = json.loads(raw)
-        for item in items:
-            if item.get('category') not in CATEGORY_ORDER:
-                item['category'] = "כללי/אחר"
-        return items
-    except Exception as e:
-        print(f"❌ AI Error: {e}", flush=True)
-        return fallback(text)
+        if "
+http://googleusercontent.com/immersive_entry_chip/0
 
-@app.route('/')
-def index():
-    conn = sqlite3.connect('shopping.db')
-    c = conn.cursor()
-    order_query = "CASE category "
-    for i, cat in enumerate(CATEGORY_ORDER):
-        order_query += f"WHEN '{cat}' THEN {i} "
-    order_query += "END"
-    c.execute(f"SELECT * FROM items ORDER BY status ASC, {order_query} ASC, name ASC")
-    items = c.fetchall()
-    conn.close()
-    return render_template('index.html', items=items)
+### למה זה יעבוד הפעם?
+1.  **CSS מקומי**: הכנסתי תגיות `<style>` בתוך הקובץ. גם אם שירות העיצוב (`Tailwind`) לא נטען בגלל חסימה או אינטרנט איטי, האתר עדיין יקבל את הפונטים הגדולים והצבעים.
+2.  **רוחב 100%**: ביטלתי את כל מה שיכול היה לגרום לזה להיראות קטן.
+3.  **פונטים ענקיים**: הגדרתי גדלים של `1.8rem` ו-`3rem` – זה ייראה ענק גם על מסך של טלוויזיה.
 
-@app.route('/add', methods=['POST'])
-def add_item():
-    name = request.form.get('item_name')
-    if name:
-        results = analyze_message(name)
-        conn = sqlite3.connect('shopping.db')
-        c = conn.cursor()
-        for item in results:
-            c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
-        conn.commit()
-        conn.close()
-    return redirect('/')
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.get_json()
-    try:
-        if 'messageData' in data and 'textMessageData' in data['messageData']:
-            full_text = data['messageData']['textMessageData']['textMessage']
-            if data['senderData']['chatId'] == ALLOWED_GROUP_ID:
-                results = analyze_message(full_text)
-                conn = sqlite3.connect('shopping.db')
-                c = conn.cursor()
-                for item in results:
-                    c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
-                conn.commit()
-                conn.close()
-    except Exception as e:
-        print(f"❌ Webhook Error: {e}", flush=True)
-    return jsonify({"status": "success"}), 200
-
-@app.route('/toggle/<int:item_id>')
-def toggle_item(item_id):
-    conn = sqlite3.connect('shopping.db')
-    c = conn.cursor()
-    c.execute("UPDATE items SET status = 1 - status WHERE id = ?", (item_id,))
-    conn.commit()
-    conn.close()
-    return redirect('/')
-
-@app.route('/clear')
-def clear_list():
-    conn = sqlite3.connect('shopping.db')
-    c = conn.cursor()
-    c.execute("DELETE FROM items WHERE status = 1")
-    conn.commit()
-    conn.close()
-    return redirect('/')
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+**תעדכן את שני הקבצים, תעשה רענון (Refresh) בדפדפן בנייד, ותגיד לי אם סוף סוף אנחנו רואים "אפליקציה" ולא "דף טקסט".** אגב, ה-AI יחזור לעבוד ברגע שנעדכן את ה-`main.py` התקין.
