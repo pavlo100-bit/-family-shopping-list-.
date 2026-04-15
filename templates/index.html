@@ -6,26 +6,26 @@
     <title>רשימת קניות</title>
     <style>
         body { font-family: system-ui, sans-serif; background: #f8fafc; margin: 0; padding: 0; direction: rtl; }
-        .container { width: 100%; max-width: 1000px; margin: 0 auto; background: white; min-height: 100vh; box-shadow: 0 0 20px rgba(0,0,0,0.05); }
+        .container { width: 100%; max-width: 1000px; margin: 0 auto; background: white; min-height: 100vh; box-shadow: 0 0 30px rgba(0,0,0,0.1); }
         header { background: #4f46e5; color: white; padding: 40px 20px; text-align: center; }
-        header h1 { font-size: 48px; margin: 0; }
-        .input-box { padding: 30px; text-align: center; border-bottom: 2px solid #f1f5f9; }
-        input { width: 80%; padding: 20px; font-size: 24px; border: 2px solid #ddd; border-radius: 12px; margin-bottom: 15px; }
-        button { width: 80%; padding: 20px; font-size: 24px; background: #4f46e5; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; }
-        .cat-header { background: #f1f5f9; padding: 15px 30px; font-weight: 800; font-size: 22px; color: #475569; border-right: 8px solid #4f46e5; margin-top: 10px; }
-        .item { display: flex; align-items: center; padding: 25px 30px; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: #1e293b; }
-        .checkbox { width: 40px; height: 40px; border: 3px solid #cbd5e1; border-radius: 50%; margin-left: 20px; flex-shrink: 0; }
+        header h1 { font-size: 50px; margin: 0; }
+        .input-box { padding: 40px; text-align: center; border-bottom: 2px solid #f1f5f9; }
+        input { width: 85%; padding: 25px; font-size: 26px; border: 3px solid #e2e8f0; border-radius: 15px; margin-bottom: 20px; outline: none; }
+        button { width: 85%; padding: 25px; font-size: 26px; background: #4f46e5; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; }
+        .cat-header { background: #f1f5f9; padding: 20px 40px; font-weight: 800; font-size: 24px; color: #475569; border-right: 10px solid #4f46e5; margin-top: 15px; }
+        .item { display: flex; align-items: center; padding: 30px 40px; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: #1e293b; }
+        .checkbox { width: 45px; height: 45px; border: 4px solid #cbd5e1; border-radius: 50%; margin-left: 25px; flex-shrink: 0; }
         .checked-bg { background: #4f46e5; border-color: #4f46e5; }
-        .text { font-size: 28px; font-weight: 600; }
+        .text { font-size: 32px; font-weight: 600; }
         .done { text-decoration: line-through; opacity: 0.4; }
-        .clear { display: block; width: 80%; margin: 40px auto; padding: 25px; background: #fff1f2; color: #e11d48; text-align: center; text-decoration: none; font-size: 24px; font-weight: 800; border-radius: 15px; border: 2px solid #fecdd3; }
+        .clear { display: block; width: 85%; margin: 50px auto; padding: 30px; background: #fff1f2; color: #e11d48; text-align: center; text-decoration: none; font-size: 26px; font-weight: 800; border-radius: 20px; border: 2px solid #fecdd3; }
     </style>
 </head>
 <body>
     <div class="container">
         <header><h1>רשימת קניות 🛒</h1></header>
         <div class="input-box">
-            <form action="/add" method="POST"><input type="text" name="item_name" placeholder="חלב, לחם, בננות..."><br><button type="submit">הוסף לרשימה</button></form>
+            <form action="/add" method="POST"><input type="text" name="item_name" placeholder="חלב, לחם..."><br><button type="submit">הוסף לרשימה</button></form>
         </div>
         <div>
             {% set ns = namespace(last_cat="") %}
@@ -37,7 +37,7 @@
                 </a>
             {% endfor %}
         </div>
-        {% if items %}<a href="/clear" class="clear">🗑️ נקה מוצרים שנקנו</a>{% endif %}
+        {% if items %}<a href="/clear" class="clear">🗑️ נקה שנקנה</a>{% endif %}
     </div>
 </body>
 </html>
