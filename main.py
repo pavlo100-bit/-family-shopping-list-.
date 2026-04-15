@@ -85,7 +85,7 @@ def analyze_message(text):
 
     except Exception as e:
         print(f"❌ Gemini error: {e}")
-        print(f"🔍 Raw response: {raw_response}")
+        print(f"🔍 Raw response for failure: {raw_response}")
         return fallback(text)
 
 @app.route('/')
