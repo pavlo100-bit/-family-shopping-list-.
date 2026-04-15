@@ -5,48 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>רשימת קניות</title>
     <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-    <link href="[https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;800&display=swap](https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;800&display=swap)" rel="stylesheet">
+    <link href="[https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&display=swap](https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&display=swap)" rel="stylesheet">
     <style>
-        body { font-family: 'Assistant', sans-serif; background-color: #f8fafc; }
+        body { font-family: 'Assistant', sans-serif; background-color: #f1f5f9; }
         .item-checked { text-decoration: line-through; opacity: 0.5; }
         .category-header { 
             position: sticky; top: 0; z-index: 10;
-            background: #f8fafc; padding: 12px 10px 4px 10px;
-            font-weight: 800; font-size: 0.8rem; color: #6366f1;
+            background: #f1f5f9; padding: 12px 10px 4px 10px;
+            font-weight: 800; font-size: 0.8rem; color: #4f46e5;
             text-transform: uppercase; border-bottom: 1px solid #e2e8f0;
         }
     </style>
 </head>
 <body class="pb-20">
-    <div class="max-w-md mx-auto">
+    <div class="max-w-md mx-auto min-h-screen">
         <header class="p-8 text-center">
-            <h1 class="text-3xl font-black text-slate-800">רשימת קניות 🛒</h1>
-            <p class="text-slate-400 text-[10px] mt-1 tracking-widest uppercase">Family Sync v16.0</p>
+            <h1 class="text-4xl font-extrabold text-slate-800 tracking-tight">רשימת קניות 🛒</h1>
+            <p class="text-slate-400 font-bold text-[10px] mt-1 tracking-widest uppercase">Family Sync v17.0</p>
         </header>
 
-        <div class="px-4 mb-6">
-            <form action="/add" method="POST" class="flex gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-                <input type="text" name="item_name" placeholder="חלב, לחם, גבינה..." class="flex-1 px-4 py-2 focus:outline-none text-lg font-medium">
-                <button type="submit" class="bg-indigo-600 text-white p-3 rounded-xl font-bold active:scale-90 transition-transform">
+        <div class="px-4 mb-8">
+            <form action="/add" method="POST" class="flex gap-2 bg-white p-2 rounded-2xl shadow-lg border border-white">
+                <input type="text" name="item_name" placeholder="חלב, לחם, גבינה..." 
+                       class="flex-1 px-4 py-3 bg-transparent focus:outline-none text-lg font-medium">
+                <button type="submit" class="bg-indigo-600 text-white p-4 rounded-xl font-bold active:scale-90 transition-transform">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
                 </button>
             </form>
         </div>
 
         <div class="px-4">
-            <div class="bg-white rounded-3xl shadow-sm overflow-hidden mb-6 border border-slate-100">
+            <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden mb-8 border border-white">
                 {% if not items %}
-                    <div class="p-16 text-center text-slate-300 font-bold italic">הרשימה ריקה... ✨</div>
+                    <div class="p-20 text-center text-slate-300 font-bold italic">הרשימה ריקה! ✨</div>
                 {% else %}
-                    <div class="p-2">
+                    <div class="p-2 pb-6">
                         {% set ns = namespace(last_cat="") %}
                         {% for item in items %}
                             {% if item[2] != ns.last_cat %}
                                 <div class="category-header">{{ item[2] }}</div>
                                 {% set ns.last_cat = item[2] %}
                             {% endif %}
-                            <a href="/toggle/{{ item[0] }}" class="flex items-center gap-4 p-4 hover:bg-slate-50 transition-colors {{ 'item-checked' if item[3] == 1 }}">
-                                <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center {{ 'bg-indigo-600 border-indigo-600' if item[3] == 1 else 'border-slate-200 bg-white shadow-sm' }}">
+                            <a href="/toggle/{{ item[0] }}" class="flex items-center gap-4 p-4 hover:bg-slate-50 rounded-2xl transition-colors {{ 'item-checked' if item[3] == 1 }}">
+                                <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center {{ 'bg-indigo-600 border-indigo-600 shadow-md' if item[3] == 1 else 'border-slate-200 bg-white' }}">
                                     {% if item[3] == 1 %}
                                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                                     {% endif %}
@@ -59,11 +60,20 @@
             </div>
 
             {% if items %}
-                <a href="/clear" class="flex items-center justify-center gap-2 w-full py-5 bg-white text-rose-500 rounded-2xl font-black border border-rose-100 shadow-sm active:bg-rose-50 transition-all">
+            <div class="px-2 mb-12">
+                <a href="/clear" class="flex items-center justify-center gap-3 w-full py-5 bg-white text-rose-500 rounded-2xl font-black border border-rose-100 shadow-sm active:bg-rose-50 transition-all">
                     🗑️ נקה מוצרים שנקנו
                 </a>
+            </div>
             {% endif %}
         </div>
+
+        <footer class="text-center p-8">
+            <div class="inline-flex items-center px-5 py-2.5 bg-white text-emerald-600 rounded-full text-xs font-black shadow-sm border border-emerald-50">
+                <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full ml-2.5 animate-pulse"></span>
+                מחובר לקבוצה המשפחתית
+            </div>
+        </footer>
     </div>
 </body>
 </html>
