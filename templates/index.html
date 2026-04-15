@@ -2,47 +2,63 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>רשימת קניות</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>רשימת קניות משפחתית</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #f0f2f5; font-family: sans-serif; padding-bottom: 50px; }
-        .container { max-width: 500px; padding: 15px; }
-        .item-card { background: white; margin-bottom: 8px; padding: 12px; border-radius: 10px; display: flex; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .item-done { background-color: #e8f5e9; opacity: 0.6; text-decoration: line-through; }
-        .category-tag { font-size: 0.75rem; background: #3e8ed0; color: white; padding: 2px 8px; border-radius: 10px; margin-right: auto; }
-        .check-box { width: 25px; height: 25px; margin-left: 15px; }
-        .add-section { position: sticky; top: 0; background: #f0f2f5; padding: 10px 0; z-index: 10; }
+        body { font-family: 'Assistant', sans-serif; background-color: #f8fafc; }
+        .item-checked { text-decoration: line-through; color: #94a3b8; }
+        .category-header { 
+            background: #f1f5f9; 
+            padding: 6px 12px; 
+            font-weight: bold; 
+            border-radius: 8px; 
+            margin-top: 16px; 
+            font-size: 0.9rem; 
+            color: #475569; 
+            border-right: 4px solid #6366f1; 
+        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1 class="title has-text-centered">🛒 הרשימה של אבי</h1>
-        
-        <div class="add-section">
-            <form action="/add" method="POST" class="field has-addons">
-                <div class="control is-expanded">
-                    <input class="input is-medium" type="text" name="item_name" placeholder="הוסף מוצר (למשל: חלב)" required>
-                </div>
-                <div class="control">
-                    <button class="button is-link is-medium">הוסף</button>
-                </div>
-            </form>
+<body class="p-4 bg-slate-50">
+    <div class="max-w-md mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden p-6 border border-slate-100">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-black text-indigo-600 mb-1">🛒 רשימת קניות</h1>
+            <p class="text-slate-400 text-sm">הקבוצה המשפחתית</p>
         </div>
+        
+        <form action="/add" method="POST" class="mb-8 flex gap-2">
+            <input type="text" name="item_name" placeholder="להוסיף מוצר..." class="flex-1 border-2 border-slate-100 rounded-2xl px-4 py-3 focus:outline-none focus:border-indigo-400 transition-all bg-slate-50 text-lg">
+            <button type="submit" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95">הוסף</button>
+        </form>
 
-        <div id="shopping-list">
+        <div class="space-y-1">
+            {% set last_cat = "" %}
             {% for item in items %}
-            <div class="item-card {{ 'item-done' if item[3] == 1 }}">
-                <input type="checkbox" class="check-box" onclick="window.location.href='/toggle/{{ item[0] }}'" {{ 'checked' if item[3] == 1 }}>
-                <span class="is-size-5">{{ item[1] }}</span>
-                <span class="category-tag">{{ item[2] }}</span>
-            </div>
+                {% if item[2] != last_cat %}
+                    <div class="category-header">{{ item[2] }}</div>
+                    {% set last_cat = item[2] %}
+                {% endif %}
+                
+                <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0">
+                    <a href="/toggle/{{ item[0] }}" class="flex-1 flex items-center gap-4 py-1">
+                        <div class="w-8 h-8 border-2 rounded-full flex items-center justify-center transition-all {{ 'bg-emerald-500 border-emerald-500 shadow-inner' if item[3] == 1 else 'border-slate-300 bg-white' }}">
+                            {% if item[3] == 1 %}
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            {% endif %}
+                        </div>
+                        <span class="text-xl font-medium text-slate-700 {{ 'item-checked' if item[3] == 1 }}">{{ item[1] }}</span>
+                    </a>
+                </div>
             {% endfor %}
         </div>
 
         {% if items %}
-        <div class="has-text-centered mt-5">
-            <a href="/clear" class="button is-danger is-light is-small">נקה מוצרים שנקנו</a>
+        <div class="mt-10 pt-6 border-t border-slate-50">
+            <a href="/clear" class="block w-full text-center py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold hover:bg-rose-100 transition-all border border-rose-100 shadow-sm active:scale-95">
+                🗑️ נקה מוצרים שנקנו
+            </a>
         </div>
         {% endif %}
     </div>
