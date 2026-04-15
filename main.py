@@ -6,9 +6,9 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# וידוא גרסה בלוגים של Railway
+# סימן זיהוי גירסה
 print("\n" + "="*50)
-print("🚀 FAMILY LIST - VERSION 18.0 - AI CLASSIFIER FIX")
+print("🚀 FAMILY LIST - VERSION 19.0 - BIG & BOLD")
 print("="*50 + "\n", flush=True)
 
 # --- הגדרות מערכת ---
@@ -21,11 +21,11 @@ if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        print("✅ AI Engine Ready for classification", flush=True)
+        print("✅ AI Engine Ready", flush=True)
     except Exception as e:
         print(f"❌ AI Init Error: {e}", flush=True)
 
-# רשימת הקטגוריות הרשמית
+# רשימת הקטגוריות
 CATEGORY_ORDER = [
     'מוצרי חלב וביצים', 'בשר ודגים', 'מאפייה', 'פירות וירקות',
     'יבשים ושימורים', 'קפואים', 'חטיפים ומתוקים', 'משקאות', 
@@ -43,7 +43,7 @@ def init_db():
 init_db()
 
 def analyze_message(text):
-    print(f"🔍 Analyzing text: {text}", flush=True)
+    print(f"🔍 Analyzing: {text}", flush=True)
     
     def fallback(t):
         parts = t.replace(' וגם ', ',').replace(' ו', ',').replace(';', ',').replace('\n', ',').split(',')
@@ -55,12 +55,9 @@ def analyze_message(text):
     try:
         prompt = f"""
         Extract items from this Hebrew shopping list: "{text}"
-        STRICT RULES:
-        1. Split multiple items.
-        2. Assign category ONLY from: {CATEGORY_ORDER}.
-        3. Clean item names.
-        4. Return ONLY a valid JSON array of objects.
-        Format: [{{"name": "item", "category": "category"}}]
+        Return ONLY a JSON array. 
+        Categories: {CATEGORY_ORDER}.
+        Example: [{{"name": "חלב", "category": "מוצרי חלב וביצים"}}]
         """
         response = model.generate_content(prompt)
         raw = response.text.strip()
