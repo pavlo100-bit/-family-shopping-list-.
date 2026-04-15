@@ -12,12 +12,11 @@ app = Flask(__name__)
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
-# אתחול הלקוח עם Gemini 2.0 Flash
 client = None
 if GEMINI_API_KEY:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        print("✅ AI Client Initialized - Gemini 2.0 Flash Ready", flush=True)
+        print("✅ AI Client Initialized - Gemini 2.0 Flash", flush=True)
     except Exception as e:
         print(f"❌ Failed to init Gemini: {e}", flush=True)
 
@@ -37,7 +36,6 @@ def init_db():
 init_db()
 
 def clean_text_manually(t):
-    # מנגנון ניקוי למקרה חירום
     ignore_words = ["תביא", "לי", "בבקשה", "רק", "תקנה", "צריך", "וגם", "גם"]
     t = t.replace(',', ' ').replace(';', ' ').replace('\n', ' ')
     for word in ignore_words:
@@ -51,7 +49,6 @@ def analyze_message(text):
     
     try:
         categories_str = "\n".join(f"- {cat}" for cat in CATEGORY_ORDER)
-        # ה-Prompt המקצועי והמעודכן שלך
         prompt = f"""אתה עוזר לסיווג מוצרי קניות לסופרמרקט.
 
 המשימה שלך:
@@ -122,6 +119,15 @@ def add_item():
             c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
         conn.commit()
         conn.close()
+    return redirect('/')
+
+@app.route('/reset')
+def reset():
+    conn = sqlite3.connect('shopping.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM items")
+    conn.commit()
+    conn.close()
     return redirect('/')
 
 @app.route('/webhook', methods=['POST'])
