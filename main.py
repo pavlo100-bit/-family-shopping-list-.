@@ -6,11 +6,11 @@ from google import genai
 
 app = Flask(__name__)
 
-# הגדרות
+# הגדרות מערכת
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
-# אתחול הלקוח החדש
+# אתחול הלקוח החדש של גוגל
 client = None
 if GEMINI_API_KEY:
     try:
@@ -37,13 +37,17 @@ def analyze_message(text):
     def fallback(t):
         parts = t.replace(' וגם ', ',').replace(' ו', ',').replace(';', ',').replace('\n', ',').split(',')
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
+    
     if not client: return fallback(text)
+    
     try:
-        prompt = f"Identify products in Hebrew. Categories: {CATEGORY_ORDER}. Return JSON: [{{'name': 'product', 'category': 'category'}}]. Text: {text}"
+        prompt = f"Identify products in Hebrew. Categories ONLY: {CATEGORY_ORDER}. Return ONLY JSON list: [{{'name': 'product', 'category': 'category'}}]. Text: {text}"
         response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+        
         raw = response.text.strip()
         if "```" in raw:
             raw = raw.split("```")[1].replace("json", "").split("```")[0].strip()
+        
         items = json.loads(raw)
         for item in items:
             if item.get('category') not in CATEGORY_ORDER:
@@ -57,7 +61,8 @@ def index():
     conn = sqlite3.connect('shopping.db')
     c = conn.cursor()
     order_query = "CASE category "
-    for i, cat in enumerate(CATEGORY_ORDER): order_query += f"WHEN '{cat}' THEN {i} "
+    for i, cat in enumerate(CATEGORY_ORDER):
+        order_query += f"WHEN '{cat}' THEN {i} "
     order_query += "END"
     c.execute(f"SELECT * FROM items ORDER BY status ASC, {order_query} ASC, name ASC")
     items = c.fetchall()
@@ -70,7 +75,8 @@ def webhook():
     try:
         if 'messageData' in data and 'textMessageData' in data['messageData']:
             full_text = data['messageData']['textMessageData']['textMessage']
-            if data['senderData']['chatId'] == ALLOWED_GROUP_ID:
+            chat_id = data['senderData']['chatId']
+            if chat_id == ALLOWED_GROUP_ID:
                 results = analyze_message(full_text)
                 conn = sqlite3.connect('shopping.db')
                 c = conn.cursor()
@@ -78,7 +84,8 @@ def webhook():
                     c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
                 conn.commit()
                 conn.close()
-    except: pass
+    except:
+        pass
     return jsonify({"status": "success"}), 200
 
 @app.route('/add', methods=['POST'])
@@ -113,4 +120,5 @@ def clear_list():
     return redirect('/')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
