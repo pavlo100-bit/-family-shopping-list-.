@@ -5,17 +5,17 @@ import os
 import json
 import google.generativeai as genai
 
-# הגדרת האפליקציה עבור Gunicorn
+# הגדרת האפליקציה - השם 'app' קריטי עבור Gunicorn ב-Railway
 app = Flask(__name__)
 
-# סימן זיהוי גירסה בלוגים של Railway
+# הדפסה לווידוא שהשרת עלה בגרסה הנכונה
 print("\n" + "="*50)
-print("🚀 FAMILY LIST - VERSION 15.0 - THE PERFECT EDITION")
+print("🚀 FAMILY LIST - VERSION 15.0 - CLEAN DEPLOY")
 print("="*50 + "\n", flush=True)
 
 # --- הגדרות מערכת ---
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
 # אתחול ה-AI
 model = None
@@ -27,7 +27,7 @@ if GEMINI_API_KEY:
     except Exception as e:
         print(f"❌ AI Init Error: {e}", flush=True)
 
-# רשימת הקטגוריות הרשמית - קובעת את סדר ההצגה באתר
+# סדר קטגוריות רשמי - קובע את סדר ההצגה באתר
 CATEGORY_ORDER = [
     'מוצרי חלב וביצים', 'בשר ודגים', 'מאפייה', 'פירות וירקות',
     'יבשים ושימורים', 'קפואים', 'חטיפים ומתוקים', 'משקאות', 
@@ -35,12 +35,15 @@ CATEGORY_ORDER = [
 ]
 
 def init_db():
-    conn = sqlite3.connect('shopping.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS items 
-                 (id INTEGER PRIMARY KEY, name TEXT, category TEXT, status INTEGER)''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('shopping.db')
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS items 
+                     (id INTEGER PRIMARY KEY, name TEXT, category TEXT, status INTEGER)''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"❌ Database Init Error: {e}", flush=True)
 
 init_db()
 
@@ -54,26 +57,17 @@ def analyze_message(text):
         cleaned = cleaned.replace(" וגם ", ",").replace(" ו", ",").replace(";", ",").replace("\n", ",")
         parts = cleaned.split(",")
         results = []
-        for part in parts:
-            name = part.strip(" .-")
+        for p in parts:
+            name = p.strip(" .-")
             if name.startswith('ו') and len(name) > 3: name = name[1:]
             if name: results.append({"name": name, "category": "כללי/אחר"})
         return results
 
-    if not model: return basic_parser(text)
+    if not model:
+        return basic_parser(text)
 
     try:
-        prompt = f"""
-        Extract items from Hebrew shopping list text.
-        RULES:
-        1. Split multiple products.
-        2. Assign the best category from: {CATEGORY_ORDER}.
-        3. Clean product names (e.g. 'רק חלב' -> 'חלב').
-        4. Return ONLY a valid JSON array of objects.
-        
-        Text: {text}
-        Format: [{{"name": "product", "category": "category"}}]
-        """
+        prompt = f"Identify shopping items in Hebrew. Split items. Assign one of these categories: {CATEGORY_ORDER}. Clean names. Return ONLY a JSON array: [{{'name': 'item', 'category': 'cat'}}]. Text: '{text}'"
         response = model.generate_content(prompt)
         raw = (response.text or "").strip()
         
@@ -83,10 +77,12 @@ def analyze_message(text):
             raw = raw.split("```")[1].split("```")[0].strip()
             
         items = json.loads(raw)
-        for item in items:
-            if item.get('category') not in CATEGORY_ORDER:
-                item['category'] = "כללי/אחר"
-        return items
+        if isinstance(items, list):
+            for item in items:
+                if item.get('category') not in CATEGORY_ORDER:
+                    item['category'] = "כללי/אחר"
+            return items
+        return basic_parser(text)
     except Exception as e:
         print(f"⚠️ AI Fail: {e}", flush=True)
         return basic_parser(text)
