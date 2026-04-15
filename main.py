@@ -1,8 +1,10 @@
 import os
 import sqlite3
 import json
+import re
 from flask import Flask, render_template, request, redirect, jsonify
 from google import genai
+from google.genai import types
 
 app = Flask(__name__)
 
@@ -10,12 +12,11 @@ app = Flask(__name__)
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
-# אתחול הלקוח
 client = None
 if GEMINI_API_KEY:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        print("✅ AI Client Initialized", flush=True)
+        print("✅ AI Client Initialized with Types Config", flush=True)
     except Exception as e:
         print(f"❌ Failed to init Gemini: {e}", flush=True)
 
@@ -34,15 +35,18 @@ def init_db():
 
 init_db()
 
+def clean_text_manually(t):
+    # מנגנון ניקוי למקרה שה-AI נכשל
+    ignore_words = ["תביא", "לי", "בבקשה", "רק", "תקנה", "צריך", "וגם", "גם"]
+    t = t.replace(',', ' ').replace(';', ' ').replace('\n', ' ')
+    for word in ignore_words:
+        t = re.sub(r'\b' + word + r'\b', '', t)
+    return [p.strip() for p in t.split() if p.strip()]
+
 def analyze_message(text):
     raw_response = "no response"
-    def fallback(t):
-        import re
-        parts = re.split(r',|;|\n| וגם ', t)
-        return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
-    
     if not client:
-        return fallback(text)
+        return [{"name": p, "category": "כללי/אחר"} for p in clean_text_manually(text)]
     
     try:
         categories_str = "\n".join(f"- {cat}" for cat in CATEGORY_ORDER)
@@ -51,31 +55,26 @@ def analyze_message(text):
 המשימה שלך:
 1. חלץ מהטקסט רק שמות מוצרים (התעלם ממילות בקשה כמו "תביא לי", "רק", "בבקשה")
 2. אם יש כמה מוצרים במשפט — פצל אותם לפריטים נפרדים
-3. סווג כל מוצר לקטגוריה המתאימה מהרשימה
+3. סווג כל מוצר לקטגוריה המתאימה מהרשימה בלבד.
 
-קטגוריות (השתמש בדיוק בשמות האלה):
+קטגוריות:
 {categories_str}
 
-פורמט פלט — JSON בלבד, בלי טקסט נוסף:
+פורמט פלט — JSON בלבד:
 [{{"name": "שם המוצר", "category": "קטגוריה"}}]
-
-דוגמאות:
-קלט: "תביא לי רק עמק פרוס דק ולחם"
-פלט: [{{"name": "עמק פרוס דק", "category": "מוצרי חלב וביצים"}}, {{"name": "לחם", "category": "מאפייה"}}]
 
 טקסט לעיבוד: {text}"""
 
+        # שימוש ב-types.GenerateContentConfig כפי שהצעת
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=prompt,
-            config={"temperature": 0}
+            config=types.GenerateContentConfig(temperature=0)
         )
         
         raw_response = response.text.strip()
         if "```" in raw_response:
-            raw_response = raw_response.split("```")[1].replace("json", "").strip()
-            if "```" in raw_response:
-                raw_response = raw_response.split("```")[0].strip()
+            raw_response = raw_response.split("```")[1].replace("json", "").strip().split("```")[0].strip()
         
         items = json.loads(raw_response)
         for item in items:
@@ -84,9 +83,8 @@ def analyze_message(text):
         return items
 
     except Exception as e:
-        print(f"❌ Gemini error: {e}")
-        print(f"🔍 Raw response for failure: {raw_response}")
-        return fallback(text)
+        print(f"❌ Error: {e} | Raw response: {raw_response}")
+        return [{"name": p, "category": "כללי/אחר"} for p in clean_text_manually(text)]
 
 @app.route('/')
 def index():
@@ -101,25 +99,6 @@ def index():
     conn.close()
     return render_template('index.html', items=items)
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.get_json()
-    try:
-        if 'messageData' in data and 'textMessageData' in data['messageData']:
-            full_text = data['messageData']['textMessageData']['textMessage']
-            chat_id = data['senderData']['chatId']
-            if chat_id == ALLOWED_GROUP_ID:
-                results = analyze_message(full_text)
-                conn = sqlite3.connect('shopping.db')
-                c = conn.cursor()
-                for item in results:
-                    c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
-                conn.commit()
-                conn.close()
-    except Exception as e:
-        print(f"❌ Webhook error: {e}")
-    return jsonify({"status": "success"}), 200
-
 @app.route('/add', methods=['POST'])
 def add_item():
     name = request.form.get('item_name')
@@ -132,6 +111,24 @@ def add_item():
         conn.commit()
         conn.close()
     return redirect('/')
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.get_json()
+    try:
+        if 'messageData' in data and 'textMessageData' in data['messageData']:
+            full_text = data['messageData']['textMessageData']['textMessage']
+            if data['senderData']['chatId'] == ALLOWED_GROUP_ID:
+                results = analyze_message(full_text)
+                conn = sqlite3.connect('shopping.db')
+                c = conn.cursor()
+                for item in results:
+                    c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
+                conn.commit()
+                conn.close()
+    except Exception as e:
+        print(f"Webhook error: {e}")
+    return jsonify({"status": "success"}), 200
 
 @app.route('/toggle/<int:item_id>')
 def toggle_item(item_id):
@@ -152,5 +149,4 @@ def clear_list():
     return redirect('/')
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
