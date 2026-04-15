@@ -1,17 +1,27 @@
 def analyze_message(text):
     print(f"🔍 Analyzing: {text}", flush=True)
 
-    # fallback פשוט אם אין מודל
     def basic_parser(text):
-        parts = text.replace(" ו", ",").replace(" וגם ", ",").split(",")
+        cleaned = text
+        for phrase in ["תביא לי", "תביא", "צריך", "לקנות", "נא לקנות", "אפשר להוסיף"]:
+            cleaned = cleaned.replace(phrase, "")
+
+        cleaned = cleaned.replace(" וגם ", ",")
+        cleaned = cleaned.replace(" ו", ",")
+        cleaned = cleaned.replace(";", ",")
+        cleaned = cleaned.replace("\n", ",")
+
+        parts = cleaned.split(",")
         results = []
+
         for part in parts:
-            name = part.strip()
+            name = part.strip(" .-")
             if name:
                 results.append({
                     "name": name,
                     "category": "כללי/אחר"
                 })
+
         return results
 
     if not model:
@@ -44,11 +54,13 @@ Text:
 """
 
         response = model.generate_content(prompt)
-        raw = response.text.strip()
+        raw = (response.text or "").strip()
+
+        if not raw:
+            raise ValueError("Empty response from Gemini")
 
         print(f"🤖 Gemini raw response: {raw}", flush=True)
 
-        # ניקוי אם המודל החזיר בלוק markdown
         if raw.startswith("```json"):
             raw = raw.replace("```json", "").replace("```", "").strip()
         elif raw.startswith("```"):
@@ -56,9 +68,16 @@ Text:
 
         items = json.loads(raw)
 
-        # ולידציה
+        if not isinstance(items, list):
+            raise ValueError("Gemini response is not a list")
+
+        seen = set()
         clean_items = []
+
         for item in items:
+            if not isinstance(item, dict):
+                continue
+
             name = str(item.get("name", "")).strip()
             category = str(item.get("category", "כללי/אחר")).strip()
 
@@ -67,6 +86,11 @@ Text:
 
             if category not in CATEGORY_ORDER:
                 category = "כללי/אחר"
+
+            key = (name, category)
+            if key in seen:
+                continue
+            seen.add(key)
 
             clean_items.append({
                 "name": name,
