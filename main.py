@@ -8,23 +8,24 @@ app = Flask(__name__)
 
 # וידוא גרסה בלוגים של Railway
 print("\n" + "="*50)
-print("🚀 FAMILY LIST - VERSION 17.0 - STABLE DEPLOY")
+print("🚀 FAMILY LIST - VERSION 18.0 - AI CLASSIFIER FIX")
 print("="*50 + "\n", flush=True)
 
-# הגדרות
+# --- הגדרות מערכת ---
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
-# אתחול ה-AI (רק אם המפתח קיים)
+# אתחול ה-AI
 model = None
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        print("✅ AI Engine Ready", flush=True)
+        print("✅ AI Engine Ready for classification", flush=True)
     except Exception as e:
         print(f"❌ AI Init Error: {e}", flush=True)
 
+# רשימת הקטגוריות הרשמית
 CATEGORY_ORDER = [
     'מוצרי חלב וביצים', 'בשר ודגים', 'מאפייה', 'פירות וירקות',
     'יבשים ושימורים', 'קפואים', 'חטיפים ומתוקים', 'משקאות', 
@@ -42,9 +43,8 @@ def init_db():
 init_db()
 
 def analyze_message(text):
-    print(f"🔍 Analyzing: {text}", flush=True)
+    print(f"🔍 Analyzing text: {text}", flush=True)
     
-    # פיצול ידני בסיסי כגיבוי
     def fallback(t):
         parts = t.replace(' וגם ', ',').replace(' ו', ',').replace(';', ',').replace('\n', ',').split(',')
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
@@ -53,9 +53,18 @@ def analyze_message(text):
         return fallback(text)
 
     try:
-        prompt = f"Extract items from Hebrew shopping list. Categories: {CATEGORY_ORDER}. Return ONLY JSON array: [{{'name': 'item', 'category': 'cat'}}]. Text: '{text}'"
+        prompt = f"""
+        Extract items from this Hebrew shopping list: "{text}"
+        STRICT RULES:
+        1. Split multiple items.
+        2. Assign category ONLY from: {CATEGORY_ORDER}.
+        3. Clean item names.
+        4. Return ONLY a valid JSON array of objects.
+        Format: [{{"name": "item", "category": "category"}}]
+        """
         response = model.generate_content(prompt)
         raw = response.text.strip()
+        
         if "```" in raw:
             raw = raw.split("```")[1]
             if raw.startswith("json"): raw = raw[4:]
@@ -66,7 +75,8 @@ def analyze_message(text):
             if item.get('category') not in CATEGORY_ORDER:
                 item['category'] = "כללי/אחר"
         return items
-    except:
+    except Exception as e:
+        print(f"❌ AI Error: {e}", flush=True)
         return fallback(text)
 
 @app.route('/')
@@ -109,8 +119,8 @@ def webhook():
                     c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
                 conn.commit()
                 conn.close()
-    except:
-        pass
+    except Exception as e:
+        print(f"❌ Webhook Error: {e}", flush=True)
     return jsonify({"status": "success"}), 200
 
 @app.route('/toggle/<int:item_id>')
