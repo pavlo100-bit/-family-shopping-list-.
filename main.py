@@ -10,7 +10,7 @@ app = Flask(__name__)
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
-# אתחול הלקוח החדש של גוגל
+# אתחול הלקוח
 client = None
 if GEMINI_API_KEY:
     try:
@@ -35,10 +35,9 @@ def init_db():
 init_db()
 
 def analyze_message(text):
-    raw = "no response"
+    raw_response = "no response"
     def fallback(t):
         import re
-        # פיצול חכם - מפרידים לפי פסיק, נקודה פסיק, שורה חדשה או "וגם"
         parts = re.split(r',|;|\n| וגם ', t)
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
     
@@ -64,9 +63,6 @@ def analyze_message(text):
 קלט: "תביא לי רק עמק פרוס דק ולחם"
 פלט: [{{"name": "עמק פרוס דק", "category": "מוצרי חלב וביצים"}}, {{"name": "לחם", "category": "מאפייה"}}]
 
-קלט: "ביצים, בננות, שמפו"
-פלט: [{{"name": "ביצים", "category": "מוצרי חלב וביצים"}}, {{"name": "בננות", "category": "פירות וירקות"}}, {{"name": "שמפו", "category": "פארם והיגיינה"}}]
-
 טקסט לעיבוד: {text}"""
 
         response = client.models.generate_content(
@@ -75,22 +71,21 @@ def analyze_message(text):
             config={"temperature": 0}
         )
         
-        raw = response.text.strip()
-        # ניקוי Markdown
-        if "```" in raw:
-            raw = raw.split("```")[1].replace("json", "").strip()
-            if "```" in raw:
-                raw = raw.split("```")[0].strip()
+        raw_response = response.text.strip()
+        if "```" in raw_response:
+            raw_response = raw_response.split("```")[1].replace("json", "").strip()
+            if "```" in raw_response:
+                raw_response = raw_response.split("```")[0].strip()
         
-        items = json.loads(raw)
+        items = json.loads(raw_response)
         for item in items:
             if item.get('category') not in CATEGORY_ORDER:
                 item['category'] = 'כללי/אחר'
         return items
 
     except Exception as e:
-        print(f"Gemini error: {e}")
-        print(f"Raw response: {raw}")
+        print(f"❌ Gemini error: {e}")
+        print(f"🔍 Raw response: {raw_response}")
         return fallback(text)
 
 @app.route('/')
@@ -122,7 +117,7 @@ def webhook():
                 conn.commit()
                 conn.close()
     except Exception as e:
-        print(f"Webhook error: {e}")
+        print(f"❌ Webhook error: {e}")
     return jsonify({"status": "success"}), 200
 
 @app.route('/add', methods=['POST'])
