@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>רשימת קניות</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <style>
+        body { background-color: #f0f2f5; font-family: sans-serif; padding-bottom: 50px; }
+        .container { max-width: 500px; padding: 15px; }
+        .item-card { background: white; margin-bottom: 8px; padding: 12px; border-radius: 10px; display: flex; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .item-done { background-color: #e8f5e9; opacity: 0.6; text-decoration: line-through; }
+        .category-tag { font-size: 0.75rem; background: #3e8ed0; color: white; padding: 2px 8px; border-radius: 10px; margin-right: auto; }
+        .check-box { width: 25px; height: 25px; margin-left: 15px; }
+        .add-section { position: sticky; top: 0; background: #f0f2f5; padding: 10px 0; z-index: 10; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title has-text-centered">🛒 הרשימה של אבי</h1>
+        
+        <div class="add-section">
+            <form action="/add" method="POST" class="field has-addons">
+                <div class="control is-expanded">
+                    <input class="input is-medium" type="text" name="item_name" placeholder="הוסף מוצר (למשל: חלב)" required>
+                </div>
+                <div class="control">
+                    <button class="button is-link is-medium">הוסף</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="shopping-list">
+            {% for item in items %}
+            <div class="item-card {{ 'item-done' if item[3] == 1 }}">
+                <input type="checkbox" class="check-box" onclick="window.location.href='/toggle/{{ item[0] }}'" {{ 'checked' if item[3] == 1 }}>
+                <span class="is-size-5">{{ item[1] }}</span>
+                <span class="category-tag">{{ item[2] }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if items %}
+        <div class="has-text-centered mt-5">
+            <a href="/clear" class="button is-danger is-light is-small">נקה מוצרים שנקנו</a>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
