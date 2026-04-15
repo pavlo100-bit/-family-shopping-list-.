@@ -6,11 +6,12 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
+# סימן זיהוי גרסה בלוגים
 print("\n" + "="*50)
-print("🚀 FAMILY LIST - VERSION 24.0 - WEBHOOK & DESKTOP FIX")
+print("🚀 FAMILY LIST - VERSION 25.0 - WEBHOOK RESTORED")
 print("="*50 + "\n", flush=True)
 
-# --- הגדרות ---
+# --- הגדרות מערכת ---
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
@@ -46,16 +47,13 @@ def analyze_message(text):
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
     if not model: return fallback(text)
     try:
-        prompt = f"Identify products in Hebrew. Categories: {CATEGORY_ORDER}. Return ONLY JSON list: [{{'name': 'product', 'category': 'category'}}]. Text: {text}"
+        prompt = "Identify shopping items in Hebrew. Categories: " + str(CATEGORY_ORDER) + ". Return ONLY JSON list: [{'name': 'item', 'category': 'cat'}]. Text: " + text
         response = model.generate_content(prompt)
         raw = response.text.strip()
         if "
 http://googleusercontent.com/immersive_entry_chip/0
 
-### מה לעשות עכשיו (חשוב מאוד):
-1. **עדכון קבצים:** תעדכן את שניהם בגיטהאב.
-2. **בדיקת ה-URL:** כנס ל-Green API. וודא שהכתובת שם היא:
-   `https://family-shopping-list-production.up.railway.app/webhook` (תבדוק שאין `/webhook/` כפול או שגיאת כתיב).
-3. **בדיקת לוגים:** אחרי ששלחת הודעה, תסתכל ב-HTTP Logs ב-Railway. אם אתה רואה **200**, זה עובד! אם זה עדיין **404**, תשלח לי צילום מסך של הגדרות ה-Webhook ב-Green API.
+### למה זה יעבוד עכשיו?
+כי החזרנו את הפונקציה `def webhook()` לקוד. בלעדיה, השרת מחזיר שגיאת **404** ל-Green API כי הוא פשוט לא יודע מה לעשות עם המידע שמגיע מהוואטסאפ.
 
-תעדכן אותי אם אחרי העדכון הזה הוויזואלי במחשב סוף סוף הסתדר.
+**תעדכן את שניהם עכשיו, וזה יחזור לעבוד כמו קסם.** תגיד לי כשיש ירוק ב-Railway!
