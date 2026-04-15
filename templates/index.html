@@ -2,78 +2,112 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>רשימת קניות</title>
-    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-    <link href="[https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&display=swap](https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&display=swap)" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>רשימת קניות משפחתית</title>
     <style>
-        body { font-family: 'Assistant', sans-serif; background-color: #f1f5f9; margin: 0; padding: 0; width: 100%; }
-        .item-checked { text-decoration: line-through; opacity: 0.5; }
-        .category-header { 
-            position: sticky; top: 0; z-index: 10;
-            background: #f1f5f9; padding: 15px 10px;
-            font-weight: 800; font-size: 1.1rem; color: #4f46e5;
-            border-bottom: 2px solid #e2e8f0;
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background-color: #f8fafc; 
+            margin: 0; padding: 0; 
+            direction: rtl;
+        }
+        /* המכולה המרכזית - מתאימה למחשב ולנייד */
+        .app-container { 
+            width: 100%; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+        header { 
+            background: #4f46e5; 
+            color: white; 
+            padding: 50px 20px; 
+            text-align: center;
+        }
+        header h1 { font-size: 48px; margin: 0; }
+        
+        .input-box { padding: 30px; border-bottom: 2px solid #f1f5f9; }
+        input[type="text"] { 
+            width: 100%; padding: 20px; font-size: 22px; 
+            border: 2px solid #e2e8f0; border-radius: 12px;
+            margin-bottom: 15px; outline: none;
+        }
+        input[type="text"]:focus { border-color: #4f46e5; }
+        button { 
+            width: 100%; padding: 20px; font-size: 22px; font-weight: bold;
+            background: #4f46e5; color: white; border: none; border-radius: 12px;
+            cursor: pointer; transition: background 0.2s;
+        }
+        button:hover { background: #4338ca; }
+
+        .category-name { 
+            background: #f1f5f9; padding: 15px 30px; font-weight: 800; 
+            font-size: 20px; color: #64748b; margin-top: 10px;
+            border-right: 6px solid #4f46e5;
+        }
+        .item-row { 
+            display: flex; align-items: center; padding: 25px 30px;
+            border-bottom: 1px solid #f1f5f9; text-decoration: none;
+            color: #1e293b; transition: bg 0.2s;
+        }
+        .item-row:hover { background: #fdfdfd; }
+        .checkbox { 
+            width: 35px; height: 35px; border: 3px solid #cbd5e1; 
+            border-radius: 50%; margin-left: 20px; flex-shrink: 0;
+        }
+        .checked-bg { background: #4f46e5; border-color: #4f46e5; }
+        .item-text { font-size: 26px; font-weight: 600; }
+        .item-checked { text-decoration: line-through; opacity: 0.4; }
+
+        .btn-clear { 
+            display: block; margin: 40px auto; width: 90%; 
+            padding: 25px; background: #fff1f2; color: #e11d48; 
+            text-align: center; text-decoration: none; font-size: 22px; 
+            font-weight: 800; border-radius: 15px; border: 2px solid #fecdd3;
         }
     </style>
 </head>
-<body class="pb-24">
-    <div class="w-full min-h-screen flex flex-col">
-        
-        <header class="p-10 text-center">
-            <h1 class="text-5xl font-extrabold text-slate-800">רשימת קניות 🛒</h1>
-            <p class="text-slate-400 font-bold mt-2 uppercase tracking-widest text-xs">Family Sync v19.0</p>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>רשימת קניות 🛒</h1>
+            <div style="font-size: 14px; opacity: 0.8; margin-top: 10px;">VERSION 23.0 - DESKTOP READY</div>
         </header>
 
-        <div class="px-6 mb-10">
-            <form action="/add" method="POST" class="flex gap-3 bg-white p-3 rounded-3xl shadow-2xl border border-white">
-                <input type="text" name="item_name" placeholder="להוסיף מוצרים..." 
-                       class="flex-1 px-4 py-4 bg-transparent focus:outline-none text-2xl font-medium">
-                <button type="submit" class="bg-indigo-600 text-white p-5 rounded-2xl font-bold shadow-lg active:scale-95 transition-all">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M12 4v16m8-8H4"/></svg>
-                </button>
+        <div class="input-box">
+            <form action="/add" method="POST">
+                <input type="text" name="item_name" placeholder="חלב, לחם, גבינה..." autocomplete="off">
+                <button type="submit">הוסף לרשימה</button>
             </form>
         </div>
 
-        <div class="px-6 flex-1">
-            <div class="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden mb-10 border border-white">
-                {% if not items %}
-                    <div class="p-24 text-center text-slate-300 font-bold text-2xl italic">הרשימה ריקה! ✨</div>
-                {% else %}
-                    <div class="p-2 pb-10">
-                        {% set ns = namespace(last_cat="") %}
-                        {% for item in items %}
-                            {% if item[2] != ns.last_cat %}
-                                <div class="category-header">{{ item[2] }}</div>
-                                {% set ns.last_cat = item[2] %}
-                            {% endif %}
-                            <a href="/toggle/{{ item[0] }}" class="flex items-center gap-6 p-6 hover:bg-slate-50 border-b border-slate-50 transition-colors {{ 'item-checked' if item[3] == 1 }}">
-                                <div class="w-12 h-12 rounded-full border-4 flex items-center justify-center {{ 'bg-indigo-600 border-indigo-600 shadow-lg' if item[3] == 1 else 'border-slate-200 bg-white' }}">
-                                    {% if item[3] == 1 %}
-                                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"/></svg>
-                                    {% endif %}
-                                </div>
-                                <span class="text-3xl font-bold text-slate-700">{{ item[1] }}</span>
-                            </a>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            </div>
-
-            {% if items %}
-            <div class="px-4 mb-20 text-center">
-                <a href="/clear" class="inline-block w-full py-8 bg-white text-rose-500 rounded-[2rem] font-black border-2 border-rose-50 shadow-xl active:bg-rose-50 transition-all text-2xl">
-                    🗑️ נקה מוצרים שנקנו
-                </a>
-            </div>
+        <div class="list-section">
+            {% if not items %}
+                <div style="text-align: center; padding: 100px 20px; color: #94a3b8; font-size: 24px; font-weight: bold;">
+                    ✨ הרשימה ריקה ומחכה לך!
+                </div>
+            {% else %}
+                {% set ns = namespace(last_cat="") %}
+                {% for item in items %}
+                    {% if item[2] != ns.last_cat %}
+                        <div class="category-name">{{ item[2] }}</div>
+                        {% set ns.last_cat = item[2] %}
+                    {% endif %}
+                    
+                    <a href="/toggle/{{ item[0] }}" class="item-row">
+                        <div class="checkbox {{ 'checked-bg' if item[3] == 1 }}"></div>
+                        <span class="item-text {{ 'item-checked' if item[3] == 1 }}">{{ item[1] }}</span>
+                    </a>
+                {% endfor %}
             {% endif %}
         </div>
 
-        <footer class="text-center p-10">
-            <div class="inline-flex items-center px-8 py-4 bg-white text-emerald-600 rounded-full text-lg font-black shadow-xl border border-emerald-50">
-                מחובר ומסונכרן
-            </div>
-        </footer>
+        {% if items %}
+            <a href="/clear" class="btn-clear">🗑️ נקה מוצרים שנקנו</a>
+        {% endif %}
     </div>
 </body>
 </html>
