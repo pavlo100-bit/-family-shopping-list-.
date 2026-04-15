@@ -5,17 +5,22 @@ import os
 import json
 import google.generativeai as genai
 
-# הגדרת האפליקציה - השם 'app' קריטי עבור Gunicorn ב-Railway
 app = Flask(__name__)
 
-# הדפסה לווידוא שהשרת עלה בגרסה הנכונה
+# סימן זיהוי גירסה
 print("\n" + "="*50)
-print("🚀 FAMILY LIST - VERSION 15.0 - CLEAN DEPLOY")
+print("🚀 FAMILY LIST - VERSION 16.0 - AI CATEGORY FIX")
 print("="*50 + "\n", flush=True)
 
 # --- הגדרות מערכת ---
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+# בדיקה אם המפתח קיים
+if not GEMINI_API_KEY:
+    print("❌ ERROR: GEMINI_API_KEY is missing in Railway Variables!", flush=True)
+else:
+    print("💎 GEMINI_API_KEY found, initializing AI...", flush=True)
 
 # אתחול ה-AI
 model = None
@@ -27,7 +32,6 @@ if GEMINI_API_KEY:
     except Exception as e:
         print(f"❌ AI Init Error: {e}", flush=True)
 
-# סדר קטגוריות רשמי - קובע את סדר ההצגה באתר
 CATEGORY_ORDER = [
     'מוצרי חלב וביצים', 'בשר ודגים', 'מאפייה', 'פירות וירקות',
     'יבשים ושימורים', 'קפואים', 'חטיפים ומתוקים', 'משקאות', 
@@ -35,57 +39,60 @@ CATEGORY_ORDER = [
 ]
 
 def init_db():
-    try:
-        conn = sqlite3.connect('shopping.db')
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS items 
-                     (id INTEGER PRIMARY KEY, name TEXT, category TEXT, status INTEGER)''')
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"❌ Database Init Error: {e}", flush=True)
+    conn = sqlite3.connect('shopping.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS items 
+                 (id INTEGER PRIMARY KEY, name TEXT, category TEXT, status INTEGER)''')
+    conn.commit()
+    conn.close()
 
 init_db()
 
 def analyze_message(text):
-    print(f"🔍 Analyzing: {text}", flush=True)
+    print(f"🔍 Analyzing text: {text}", flush=True)
 
-    def basic_parser(text):
-        cleaned = text
-        for phrase in ["תביא לי", "תביא", "צריך", "לקנות", "נא לקנות", "אפשר להוסיף", "רק"]:
-            cleaned = cleaned.replace(phrase, "")
-        cleaned = cleaned.replace(" וגם ", ",").replace(" ו", ",").replace(";", ",").replace("\n", ",")
+    def fallback_parser(t):
+        print("⚠️ Using fallback parser (General category)", flush=True)
+        cleaned = t.replace(" וגם ", ",").replace(" ו", ",").replace(";", ",").replace("\n", ",")
         parts = cleaned.split(",")
-        results = []
-        for p in parts:
-            name = p.strip(" .-")
-            if name.startswith('ו') and len(name) > 3: name = name[1:]
-            if name: results.append({"name": name, "category": "כללי/אחר"})
-        return results
+        return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
 
     if not model:
-        return basic_parser(text)
+        return fallback_parser(text)
 
     try:
-        prompt = f"Identify shopping items in Hebrew. Split items. Assign one of these categories: {CATEGORY_ORDER}. Clean names. Return ONLY a JSON array: [{{'name': 'item', 'category': 'cat'}}]. Text: '{text}'"
-        response = model.generate_content(prompt)
-        raw = (response.text or "").strip()
+        prompt = f"""
+        Extract items from Hebrew shopping list.
+        Rules:
+        1. Split multiple items.
+        2. Assign category ONLY from: {CATEGORY_ORDER}.
+        3. Clean item name (e.g. 'תביא חלב' -> 'חלב').
+        4. Return ONLY valid JSON array.
         
-        if "```json" in raw:
-            raw = raw.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw:
-            raw = raw.split("```")[1].split("```")[0].strip()
-            
+        Text: {text}
+        Format example: [{{"name": "חלב", "category": "מוצרי חלב וביצים"}}]
+        """
+        response = model.generate_content(prompt)
+        raw = response.text.strip()
+        
+        # ניקוי JSON אגרסיבי
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"): raw = raw[4:]
+            raw = raw.split("```")[0].strip()
+        
         items = json.loads(raw)
-        if isinstance(items, list):
-            for item in items:
-                if item.get('category') not in CATEGORY_ORDER:
-                    item['category'] = "כללי/אחר"
-            return items
-        return basic_parser(text)
+        print(f"🤖 AI split successfully into {len(items)} items", flush=True)
+        
+        # וידוא קטגוריה
+        for item in items:
+            if item.get('category') not in CATEGORY_ORDER:
+                item['category'] = "כללי/אחר"
+        return items
+        
     except Exception as e:
-        print(f"⚠️ AI Fail: {e}", flush=True)
-        return basic_parser(text)
+        print(f"❌ AI Analysis failed: {e}", flush=True)
+        return fallback_parser(text)
 
 @app.route('/')
 def index():
