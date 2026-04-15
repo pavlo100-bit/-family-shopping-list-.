@@ -1,51 +1,84 @@
-from flask import Flask, render_template, request, redirect, jsonify
-import sqlite3
-import os
-import json
-import google.generativeai as genai
-
-app = Flask(__name__)
-
-# הדפסה לווידוא שהשרת עלה
-print("\n" + "="*50)
-print("🚀 FAMILY SHOPPING LIST - VERSION 11.0 IS ONLINE")
-print("="*50 + "\n", flush=True)
-
-# הגדרות - וודא שהמפתח נמצא ב-Variables ב-Railway
-ALLOWED_GROUP_ID = '120363425281087335@g.us'
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-
-# אתחול ה-AI
-model = None
-if GEMINI_API_KEY:
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        print("✅ Gemini AI Engine Ready", flush=True)
-    except Exception as e:
-        print(f"❌ AI Init Error: {e}", flush=True)
-
-CATEGORY_ORDER = [
-    'יבשים ושימורים', 'מוצרי חלב וביצים', 'בשר ודגים', 'פירות וירקות',
-    'מאפייה', 'קפואים', 'חטיפים ומתוקים', 'משקאות', 'ניקיון ותחזוקה',
-    'פארם והיגיינה', 'כללי/אחר'
-]
-
-def init_db():
-    conn = sqlite3.connect('shopping.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS items 
-                 (id INTEGER PRIMARY KEY, name TEXT, category TEXT, status INTEGER)''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
 def analyze_message(text):
     print(f"🔍 Analyzing: {text}", flush=True)
-    if model:
-        try:
-            prompt = f"Identify products in Hebrew. Split by commas or 'and'. Clean prefixes like 'bring me'. Categories: {CATEGORY_ORDER}. Return JSON list: [{{'name': 'product', 'category': 'cat'}}]. Text: '{text}'"
-            response = model.generate_content(prompt)
-            raw = response.text.strip()
-            if "
+
+    # fallback פשוט אם אין מודל
+    def basic_parser(text):
+        parts = text.replace(" ו", ",").replace(" וגם ", ",").split(",")
+        results = []
+        for part in parts:
+            name = part.strip()
+            if name:
+                results.append({
+                    "name": name,
+                    "category": "כללי/אחר"
+                })
+        return results
+
+    if not model:
+        print("⚠️ Gemini model not available, using fallback parser", flush=True)
+        return basic_parser(text)
+
+    try:
+        prompt = f"""
+You are an assistant that extracts shopping list items from Hebrew text.
+
+Rules:
+1. Return ONLY valid JSON.
+2. No markdown.
+3. No explanation text.
+4. Output must be a JSON array.
+5. Each item must have:
+   - "name"
+   - "category"
+6. Category must be one of:
+{json.dumps(CATEGORY_ORDER, ensure_ascii=False)}
+
+Example output:
+[
+  {{"name": "חלב", "category": "מוצרי חלב וביצים"}},
+  {{"name": "עגבניות", "category": "פירות וירקות"}}
+]
+
+Text:
+{text}
+"""
+
+        response = model.generate_content(prompt)
+        raw = response.text.strip()
+
+        print(f"🤖 Gemini raw response: {raw}", flush=True)
+
+        # ניקוי אם המודל החזיר בלוק markdown
+        if raw.startswith("```json"):
+            raw = raw.replace("```json", "").replace("```", "").strip()
+        elif raw.startswith("```"):
+            raw = raw.replace("```", "").strip()
+
+        items = json.loads(raw)
+
+        # ולידציה
+        clean_items = []
+        for item in items:
+            name = str(item.get("name", "")).strip()
+            category = str(item.get("category", "כללי/אחר")).strip()
+
+            if not name:
+                continue
+
+            if category not in CATEGORY_ORDER:
+                category = "כללי/אחר"
+
+            clean_items.append({
+                "name": name,
+                "category": category
+            })
+
+        if not clean_items:
+            print("⚠️ No valid items after cleanup, using fallback parser", flush=True)
+            return basic_parser(text)
+
+        return clean_items
+
+    except Exception as e:
+        print(f"❌ Analyze error: {e}", flush=True)
+        return basic_parser(text)
