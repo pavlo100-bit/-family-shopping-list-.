@@ -6,12 +6,12 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# הדפסת גרסה ללוגים
+# סימן זיהוי גירסה - לוודא שגרסה 23 נטענה
 print("\n" + "="*50)
-print("🚀 FAMILY LIST - VERSION 21.0 - STRING FIX")
+print("🚀 FAMILY LIST - VERSION 23.0 - DESKTOP & AI FIX")
 print("="*50 + "\n", flush=True)
 
-# הגדרות
+# --- הגדרות מערכת ---
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
@@ -21,9 +21,11 @@ if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        print("✅ AI Engine initialized successfully", flush=True)
+        print("✅ AI Engine Ready - Version 23", flush=True)
     except Exception as e:
         print(f"❌ AI Init Error: {e}", flush=True)
+else:
+    print("⚠️ WARNING: GEMINI_API_KEY is not defined in Railway Variables!", flush=True)
 
 CATEGORY_ORDER = [
     'מוצרי חלב וביצים', 'בשר ודגים', 'מאפייה', 'פירות וירקות',
@@ -41,35 +43,35 @@ def init_db():
 init_db()
 
 def analyze_message(text):
-    print(f"🔍 Analyzing: {text}", flush=True)
+    print(f"🔍 Analyzing text: {text}", flush=True)
     
     def fallback(t):
         parts = t.replace(' וגם ', ',').replace(' ו', ',').replace(';', ',').replace('\n', ',').split(',')
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
 
     if not model:
+        print("⚠️ Model not initialized - check API Key", flush=True)
         return fallback(text)
 
     try:
-        # פקודה פשוטה ללא גרשיים מורכבים למניעת שגיאות Syntax
-        prompt = "Identify products in Hebrew. Split items. Categories: " + str(CATEGORY_ORDER) + ". Return ONLY JSON: [{'name': 'item', 'category': 'cat'}]. Text to analyze: " + text
-        
+        # פרומפט חזק ומדויק
+        prompt = f"Identify products in Hebrew. Categories ONLY: {CATEGORY_ORDER}. Return ONLY a JSON list: [{{'name': 'product', 'category': 'category'}}]. Text: {text}"
         response = model.generate_content(prompt)
         raw = response.text.strip()
         
-        # ניקוי JSON
+        # ניקוי JSON במידה וה-AI מוסיף שטויות
         if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"): raw = raw[4:]
-            raw = raw.split("```")[0].strip()
+            raw = raw.split("```")[1].replace("json", "").split("```")[0].strip()
         
+        print(f"🤖 AI Response: {raw}", flush=True)
         items = json.loads(raw)
+        
         for item in items:
             if item.get('category') not in CATEGORY_ORDER:
                 item['category'] = "כללי/אחר"
         return items
     except Exception as e:
-        print(f"❌ AI Analysis Error: {e}", flush=True)
+        print(f"❌ AI Error: {e}", flush=True)
         return fallback(text)
 
 @app.route('/')
@@ -97,24 +99,6 @@ def add_item():
         conn.commit()
         conn.close()
     return redirect('/')
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.get_json()
-    try:
-        if 'messageData' in data and 'textMessageData' in data['messageData']:
-            full_text = data['messageData']['textMessageData']['textMessage']
-            if data['senderData']['chatId'] == ALLOWED_GROUP_ID:
-                results = analyze_message(full_text)
-                conn = sqlite3.connect('shopping.db')
-                c = conn.cursor()
-                for item in results:
-                    c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
-                conn.commit()
-                conn.close()
-    except:
-        pass
-    return jsonify({"status": "success"}), 200
 
 @app.route('/toggle/<int:item_id>')
 def toggle_item(item_id):
