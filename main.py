@@ -4,6 +4,9 @@ import os
 
 app = Flask(__name__)
 
+# --- הגדרת הקבוצה המורשית ---
+ALLOWED_GROUP_ID = '120363425281087335@g.us'
+
 # --- יצירת בסיס הנתונים ---
 def init_db():
     conn = sqlite3.connect('shopping.db')
@@ -41,6 +44,7 @@ def categorize(item_name):
 def index():
     conn = sqlite3.connect('shopping.db')
     c = conn.cursor()
+    # מיון: מה שטרם נקנה למעלה, ואז לפי קטגוריות
     c.execute("SELECT * FROM items ORDER BY status ASC, category ASC")
     items = c.fetchall()
     conn.close()
@@ -64,25 +68,24 @@ def add_item():
 def webhook():
     data = request.get_json()
     
-    # הדפסה ללוגים כדי שנוכל למצוא את ה-Chat ID
-    print("🔔 הודעה חדשה הגיעה מגרין API:", data)
-    
     try:
-        # בדיקה אם זו הודעה נכנסת
         if data.get('typeWebhook') == 'incomingMessageReceived':
             chat_id = data['senderData']['chatId']
-            message_text = data['messageData']['textMessageData']['textMessage']
             
-            # כרגע אנחנו מאפשרים לכל הודעה להיכנס. 
-            # בשלב הבא נסנן רק לפי ה-ID של הקבוצה שלך.
-            category = categorize(message_text)
-            conn = sqlite3.connect('shopping.db')
-            c = conn.cursor()
-            c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (message_text, category))
-            conn.commit()
-            conn.close()
-            print(f"✅ מוצר נוסף בוואטסאפ: {message_text}")
-            
+            # הבדיקה הקריטית: האם ההודעה מהקבוצה המשפחתית?
+            if chat_id == ALLOWED_GROUP_ID:
+                message_text = data['messageData']['textMessageData']['textMessage']
+                category = categorize(message_text)
+                
+                conn = sqlite3.connect('shopping.db')
+                c = conn.cursor()
+                c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (message_text, category))
+                conn.commit()
+                conn.close()
+                print(f"✅ מוצר נוסף מהקבוצה: {message_text}")
+            else:
+                print(f"⚠️ התעלמתי מהודעה מכתובת לא מורשית: {chat_id}")
+                
     except Exception as e:
         print(f"❌ שגיאה בעיבוד הודעה: {e}")
         
