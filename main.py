@@ -1,34 +1,27 @@
-import sys
-from flask import Flask, render_template, request, redirect, jsonify
-import sqlite3
 import os
 import json
+import sqlite3
+from flask import Flask, render_template, request, redirect, jsonify
 import google.generativeai as genai
 
 app = Flask(__name__)
 
-# סימן זיהוי גירסה
+# וידוא גרסה בלוגים של Railway
 print("\n" + "="*50)
-print("🚀 FAMILY LIST - VERSION 16.0 - AI CATEGORY FIX")
+print("🚀 FAMILY LIST - VERSION 17.0 - STABLE DEPLOY")
 print("="*50 + "\n", flush=True)
 
-# --- הגדרות מערכת ---
+# הגדרות
 ALLOWED_GROUP_ID = '120363425281087335@g.us'
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
-# בדיקה אם המפתח קיים
-if not GEMINI_API_KEY:
-    print("❌ ERROR: GEMINI_API_KEY is missing in Railway Variables!", flush=True)
-else:
-    print("💎 GEMINI_API_KEY found, initializing AI...", flush=True)
-
-# אתחול ה-AI
+# אתחול ה-AI (רק אם המפתח קיים)
 model = None
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash')
-        print("✅ Gemini AI Engine Ready", flush=True)
+        print("✅ AI Engine Ready", flush=True)
     except Exception as e:
         print(f"❌ AI Init Error: {e}", flush=True)
 
@@ -49,50 +42,32 @@ def init_db():
 init_db()
 
 def analyze_message(text):
-    print(f"🔍 Analyzing text: {text}", flush=True)
-
-    def fallback_parser(t):
-        print("⚠️ Using fallback parser (General category)", flush=True)
-        cleaned = t.replace(" וגם ", ",").replace(" ו", ",").replace(";", ",").replace("\n", ",")
-        parts = cleaned.split(",")
+    print(f"🔍 Analyzing: {text}", flush=True)
+    
+    # פיצול ידני בסיסי כגיבוי
+    def fallback(t):
+        parts = t.replace(' וגם ', ',').replace(' ו', ',').replace(';', ',').replace('\n', ',').split(',')
         return [{"name": p.strip(), "category": "כללי/אחר"} for p in parts if p.strip()]
 
     if not model:
-        return fallback_parser(text)
+        return fallback(text)
 
     try:
-        prompt = f"""
-        Extract items from Hebrew shopping list.
-        Rules:
-        1. Split multiple items.
-        2. Assign category ONLY from: {CATEGORY_ORDER}.
-        3. Clean item name (e.g. 'תביא חלב' -> 'חלב').
-        4. Return ONLY valid JSON array.
-        
-        Text: {text}
-        Format example: [{{"name": "חלב", "category": "מוצרי חלב וביצים"}}]
-        """
+        prompt = f"Extract items from Hebrew shopping list. Categories: {CATEGORY_ORDER}. Return ONLY JSON array: [{{'name': 'item', 'category': 'cat'}}]. Text: '{text}'"
         response = model.generate_content(prompt)
         raw = response.text.strip()
-        
-        # ניקוי JSON אגרסיבי
         if "```" in raw:
             raw = raw.split("```")[1]
             if raw.startswith("json"): raw = raw[4:]
             raw = raw.split("```")[0].strip()
         
         items = json.loads(raw)
-        print(f"🤖 AI split successfully into {len(items)} items", flush=True)
-        
-        # וידוא קטגוריה
         for item in items:
             if item.get('category') not in CATEGORY_ORDER:
                 item['category'] = "כללי/אחר"
         return items
-        
-    except Exception as e:
-        print(f"❌ AI Analysis failed: {e}", flush=True)
-        return fallback_parser(text)
+    except:
+        return fallback(text)
 
 @app.route('/')
 def index():
@@ -126,8 +101,7 @@ def webhook():
     try:
         if 'messageData' in data and 'textMessageData' in data['messageData']:
             full_text = data['messageData']['textMessageData']['textMessage']
-            chat_id = data['senderData']['chatId']
-            if chat_id == ALLOWED_GROUP_ID:
+            if data['senderData']['chatId'] == ALLOWED_GROUP_ID:
                 results = analyze_message(full_text)
                 conn = sqlite3.connect('shopping.db')
                 c = conn.cursor()
@@ -135,8 +109,8 @@ def webhook():
                     c.execute("INSERT INTO items (name, category, status) VALUES (?, ?, 0)", (item['name'], item['category']))
                 conn.commit()
                 conn.close()
-    except Exception as e:
-        print(f"❌ Webhook Error: {e}", flush=True)
+    except:
+        pass
     return jsonify({"status": "success"}), 200
 
 @app.route('/toggle/<int:item_id>')
