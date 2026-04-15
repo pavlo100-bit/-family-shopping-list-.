@@ -16,7 +16,7 @@ client = None
 if GEMINI_API_KEY:
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        print("✅ AI Client Initialized with Types Config", flush=True)
+        print("✅ AI Client Initialized - Gemini 2.0 Flash", flush=True)
     except Exception as e:
         print(f"❌ Failed to init Gemini: {e}", flush=True)
 
@@ -36,7 +36,6 @@ def init_db():
 init_db()
 
 def clean_text_manually(t):
-    # מנגנון ניקוי למקרה שה-AI נכשל
     ignore_words = ["תביא", "לי", "בבקשה", "רק", "תקנה", "צריך", "וגם", "גם"]
     t = t.replace(',', ' ').replace(';', ' ').replace('\n', ' ')
     for word in ignore_words:
@@ -65,9 +64,9 @@ def analyze_message(text):
 
 טקסט לעיבוד: {text}"""
 
-        # שימוש ב-types.GenerateContentConfig כפי שהצעת
+        # מעבר ל-Gemini 2.0 Flash עם הקונפיגורציה החדשה
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash",
             contents=prompt,
             config=types.GenerateContentConfig(temperature=0)
         )
